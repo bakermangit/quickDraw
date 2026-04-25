@@ -369,7 +369,7 @@
     <!-- Recording Modal -->
     <div id="record-modal" class="modal-overlay">
         <div class="modal">
-            <h2>Record Gesture</h2>
+            <h2 id="modal-title">Record Gesture</h2>
             
             <div class="canvas-container">
                 <div id="waiting-msg" class="waiting-text">Draw your gesture with your configured trigger...</div>
@@ -393,6 +393,7 @@
 
             <div class="modal-actions">
                 <button class="secondary" onclick="closeModal()">Cancel</button>
+                <button id="re-record-btn" class="secondary" onclick="reRecord()" style="display: none;">Re-record</button>
                 <button id="save-gest-btn" onclick="saveNewGesture()" disabled>Save Gesture</button>
             </div>
         </div>
@@ -402,6 +403,8 @@
         let ws;
         let configData = null;
         let pendingCapture = null;
+        let currentGestures = [];
+        let isEditing = false;
 
         // UI Elements
         const dot = document.getElementById('ws-dot');
@@ -546,6 +549,7 @@
         }
 
         function renderGestures(gestures) {
+            currentGestures = gestures;
             gestureList.innerHTML = '';
             if (gestures.length === 0) {
                 gestureList.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No gestures defined yet.</p>';
@@ -563,7 +567,10 @@
                         <h3>${g.name}</h3>
                         <p>Action: ${actionStr} ${threshStr}</p>
                     </div>
-                    <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
+                    <div class="gesture-actions">
+                        <button class="secondary" onclick="editGesture('${g.name}')">Edit</button>
+                        <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
+                    </div>
                 `;
                 gestureList.appendChild(div);
             });
@@ -579,8 +586,55 @@
             ws.send(JSON.stringify({ type: 'reload' }));
         }
 
+        function editGesture(name) {
+            const gesture = currentGestures.find(g => g.name === name);
+            if (!gesture) return;
+
+            isEditing = true;
+            document.getElementById('modal-title').innerText = 'Edit Gesture';
+            document.getElementById('re-record-btn').style.display = 'inline-block';
+
+            document.getElementById('new-gest-name').value = gesture.name;
+            document.getElementById('new-gest-action').value = formatAction(gesture.action);
+            document.getElementById('new-gest-threshold').value = gesture.confidence_threshold || '';
+
+            pendingCapture = {
+                raw: gesture.raw,
+                processed: {
+                    algorithm: gesture.pattern.algorithm,
+                    template_points: gesture.pattern.template_points
+                }
+            };
+
+            document.getElementById('record-modal').classList.add('active');
+            document.getElementById('waiting-msg').style.display = 'none';
+            document.getElementById('gesture-details').style.display = 'block';
+            document.getElementById('save-gest-btn').disabled = false;
+
+            drawPath(gesture.raw.points);
+        }
+
+        function reRecord() {
+            document.getElementById('waiting-msg').style.display = 'block';
+            document.getElementById('gesture-details').style.display = 'none';
+            document.getElementById('save-gest-btn').disabled = true;
+
+            const canvas = document.getElementById('gesture-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ws.send(JSON.stringify({ type: 'start_capture' }));
+        }
+
         // Modal and Recording Logic
         function startRecording() {
+            isEditing = false;
+            document.getElementById('modal-title').innerText = 'Record Gesture';
+            document.getElementById('re-record-btn').style.display = 'none';
+            document.getElementById('new-gest-name').value = '';
+            document.getElementById('new-gest-action').value = '';
+            document.getElementById('new-gest-threshold').value = '';
+
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
@@ -606,10 +660,6 @@
             document.getElementById('gesture-details').style.display = 'block';
             document.getElementById('save-gest-btn').disabled = false;
             
-            document.getElementById('new-gest-name').value = '';
-            document.getElementById('new-gest-action').value = '';
-            document.getElementById('new-gest-threshold').value = '';
-
             drawPath(msg.raw.points);
         }
 
