@@ -52,3 +52,21 @@ Below is the list of keys and buttons that can be used in your `[trigger]` confi
 - [x] Triggers are case-insensitive and order-independent
 - [x] Mouse buttons renamed to `Mouse1`..`Mouse5`
 - [x] Task decisions and accepted keys documented in docs/tasks/task8.md
+
+---
+
+## Addendum — Architect Review (2026-04-25)
+
+All decisions accepted. This task did significantly more than the original scope — the trigger refactor in particular is a meaningful architectural improvement.
+
+### Confirmed: GestureAccumulator extraction
+Pulling the point/timestamp accumulation into its own struct and sharing it between `run()` and `capture_one()` is the right call. It eliminates the divergence risk where two code paths accumulate differently and produce subtly different results.
+
+### Confirmed: Unified string-based TriggerConfig
+Changing from `ButtonCombo { first: MouseButton, second: MouseButton }` to `Combo { key1: String, key2: String }` is a genuine improvement. String keys allow keyboard modifiers and mouse buttons to be treated uniformly, the TOML schema is simpler, and the serde aliases preserve backward compatibility. ARCHITECTURE.md has been updated to reflect this.
+
+### Confirmed: 1D bias fix in dollar_one.rs
+The proportional scaling fallback for degenerate bounding boxes (shortest dimension ≤ 30% of longest) is the right fix for straight-line gestures like swipe-left/right/up/down. Without it, the scale step stretches horizontal lines into squares which breaks recognition. This fix was not in the original spec and should be noted as an improvement to the algorithm.
+
+### Note: accepted trigger key table
+The accepted key table in this file is the canonical reference for valid trigger config values. Task documentation for future trigger changes should update this table.

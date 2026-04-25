@@ -39,3 +39,21 @@ Implement a web-based configuration UI for QuickDraw that communicates with the 
 - [x] Deletion works
 - [x] Settings save and persist
 - [x] Documented in `task11.md`
+
+---
+
+## Addendum — Architect Review (2026-04-25)
+
+All decisions accepted. Most complex task of v1 — implemented correctly across all three parts.
+
+### Confirmed: Arc<Mutex<ServerState>> for shared server state
+This is the one deliberate exception to the "no shared mutable state" rule in CONVENTIONS.md. It's justified: the WebSocket server needs to share config and gesture_profile data across concurrent connections, and a channel-per-connection approach would be significantly more complex. `tokio::sync::Mutex` (async-aware) is the right choice here over `std::sync::Mutex`. ARCHITECTURE.md has been updated to document this exception explicitly.
+
+### Confirmed: CaptureRequest/CaptureResult oneshot pattern
+Using a oneshot channel inside `CaptureRequest` so the server handler can `await` the pipeline's response is the correct pattern. The pipeline receives the request, does the capture, sends the result back through the oneshot, and the WebSocket handler gets it and sends `capture_result` to the browser. Clean separation.
+
+### Confirmed: futures-util for split WebSocket stream
+Adding `futures-util` to handle concurrent sink/stream is standard for axum WebSocket work. No concerns.
+
+### Known limitation: gesture editing
+The UI supports record + delete but not edit-in-place. Editing requires deleting and re-recording. This is a known gap tracked as a future iteration task.

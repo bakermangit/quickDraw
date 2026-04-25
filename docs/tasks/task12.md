@@ -28,3 +28,21 @@ Address remaining compiler warnings, fix application lifecycle issues related to
 - [x] Tray Quit exits cleanly
 - [x] No unexpected compiler warnings (allowed dead_code is fine)
 - [x] Documented in `task12.md`
+
+---
+
+## Addendum — Architect Review (2026-04-25)
+
+All decisions accepted. v1 is complete and clean.
+
+### Confirmed: Box::pin for re-polling pipeline in loop
+Pinning `pipeline.run()` with `Box::pin` before the `loop` and polling it via `&mut pinned` is the correct Rust pattern when you need to poll the same future across multiple `select!` iterations without consuming it. Alternative would be restructuring `Pipeline` to not consume `self` in `run()` — this is simpler.
+
+### Confirmed: explicit MouseButton matching over format!("{:?}")
+The original `format!("{:?}")` approach for trigger matching was fragile (depends on Debug impl format) and allocates a String on every input event. Explicit match arms are zero-cost and correct. Good cleanup.
+
+### Confirmed: #[allow(dead_code)] for extension API
+Marking `ActionRequest`, `GestureFilter`, `can_block()`, and `name()` on traits as allowed dead_code (rather than removing them) is the right call. These are documented extension points — removing them would mean the next agent implementing a new module has to rediscover the interface from scratch.
+
+### v1 status
+`cargo build --release` passes with zero errors. The core pipeline is production-quality for its intended use case. All subsequent work is iteration and new feature development.

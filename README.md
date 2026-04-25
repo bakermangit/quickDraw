@@ -1,59 +1,118 @@
 # QuickDraw
 
-A system-wide mouse gesture recognition engine for Windows, built in Rust. Designed primarily for gaming (works in exclusive fullscreen), but applicable to any context.
+A system-wide mouse gesture recognition engine for Windows, built in Rust. Designed primarily for gaming (works in exclusive fullscreen via Raw Input), but applicable to any context.
 
-QuickDraw runs as a lightweight background daemon that captures mouse input, recognizes gestures, and executes configurable actions (keyboard input, mouse clicks, code execution).
+QuickDraw runs as a lightweight background daemon. It captures mouse input, recognizes gestures, and executes configurable actions. Control it via a system tray icon and an on-demand web-based config UI.
 
-## Key Features
+## Features
 
-- **System-wide**: Works in exclusive fullscreen games via Raw Input
-- **Modular**: Swap input capture methods, recognition algorithms, and output actions independently
-- **Lightweight**: No overlay, no GUI — just a tray icon and optional web-based config
-- **Anti-cheat friendly**: Multiple input capture backends (Raw Input, hooks, polling) for compatibility
-- **Configurable triggers**: M1+M2 combo, keyboard modifiers, or custom triggers
+- **Exclusive fullscreen compatible** — uses Raw Input (`RIDEV_INPUTSINK`), not hooks
+- **Modular pipeline** — swap input backends, recognition algorithms, and output actions independently via config
+- **Configurable trigger** — M1+M2 combo by default; fully configurable
+- **Cursor reset** — teleports cursor back to gesture-start position after completion (eliminates camera drift)
+- **Per-gesture tuning** — override confidence threshold per gesture
+- **Audio feedback** — configurable success/error sounds with per-gesture overrides
+- **Web config UI** — accessible at `http://localhost:9876` while the daemon runs
+- **Portable mode** — place `config.toml` next to the exe to keep all data local; falls back to `%APPDATA%\QuickDraw`
+- **CLI gesture capture** — `quickdraw --capture <name> <action>` for scripted setup
 
 ## Architecture
 
 ```
-Input Source ──► Gesture Engine ──► Output Action
-(Raw Input)      ($1 Recognizer)    (Keyboard Sim)
-(Hooks)          (Rubine)           (Mouse Click)
-(Polling)        (+ Velocity Filter)(Code Exec)
+Mouse Input
+    │
+    ▼
+┌─────────────┐     ┌──────────────────┐     ┌───────────────┐
+│ Input Source │────►│  Gesture Engine  │────►│ Output Action │
+│ (Raw Input)  │     │  ($1 Recognizer) │     │ (Keyboard Sim)│
+└─────────────┘     └──────────────────┘     └───────────────┘
+        │                    │
+        ▼                    ▼
+  TriggerDetector      GestureCapture
+  (state machine)      accumulation
 ```
 
-See [DESIGN_OVERVIEW.md](docs/DESIGN_OVERVIEW.md) and [ARCHITECTURE.md](docs/ARCHITECTURE.md) for full details.
+Each stage is a trait — new backends, algorithms, and actions can be added without modifying existing code.
 
-## Project Status
+## Status
 
-**Pre-development** — Documentation and architecture phase.
+**v1 complete.** Core pipeline is functional and in active iteration.
 
-### v1 Scope
-- [x] Documentation and architecture design
-- [ ] Raw Input capture
-- [ ] $1 gesture recognizer
-- [ ] Keyboard output simulation
-- [ ] TOML configuration
-- [ ] System tray icon
-- [ ] WebSocket IPC + web config UI
+### v1 Implemented
+- [x] Raw Input capture (`RIDEV_INPUTSINK`, works in exclusive fullscreen)
+- [x] $1 Unistroke Recognizer (direction-sensitive — rotation normalization intentionally omitted)
+- [x] Keyboard output via `SendInput` (virtual key names, modifier support)
+- [x] TOML configuration with auto-generated defaults
+- [x] Gesture profiles (per-profile TOML, multiple profiles supported)
+- [x] System tray icon (Configure / Quit)
+- [x] WebSocket IPC + web config UI (gesture recording, settings, delete)
+- [x] CLI capture mode (`--capture`)
+- [x] Cursor reset after gesture
+- [x] Audio feedback (success/error WAV, per-gesture override)
+- [x] Per-gesture confidence threshold override
+- [x] Portable config mode
+
+### Roadmap
+- [ ] Gesture editing in UI (currently: delete + re-record)
+- [ ] Multiple templates per gesture (improves recognition consistency)
+- [ ] Rubine recognizer (alternative algorithm, velocity-aware)
+- [ ] Radial menu / sector-based action wheel
+- [ ] Alternative trigger mode (swallow-next-click as gesture boundary)
+- [ ] Gesture trace overlay (debug/recording aid)
+- [ ] Hook and polling input backends
+- [ ] Mouse click and code execution output actions
 
 ## Building
 
-```bash
+```powershell
 cargo build --release
+```
+
+Requires Rust stable. Windows only (uses Win32 API throughout).
+
+## Running
+
+```powershell
+# Normal daemon mode
+cargo run --release
+
+# CLI gesture capture (records one gesture and saves to profile)
+cargo run --release -- --capture "swipe-right" "key:F1"
+cargo run --release -- --capture "swipe-left" "key:Ctrl+Z"
 ```
 
 ## Configuration
 
-Gesture profiles are stored in TOML format. See `config.example.toml` for reference.
+On first run, QuickDraw creates `%APPDATA%\QuickDraw\config.toml` with defaults.
+
+**Portable mode**: place a `config.toml` next to `quickdraw.exe` and all data (gestures, sounds) will be stored there instead.
+
+The web UI at `http://localhost:9876` provides a GUI for recording gestures and changing settings.
+
+### Trigger configuration
+
+```toml
+[trigger]
+type = "combo"
+key1 = "Mouse1"   # Left mouse button
+key2 = "Mouse2"   # Right mouse button
+```
+
+### Gesture profile example
+
+Gesture profiles live in `gestures/<profile-name>.toml`. They are generated by the web UI or `--capture` CLI. Manual editing is possible but not recommended — the template_points array is machine-generated.
 
 ## Documentation
 
-- [Design Overview](docs/DESIGN_OVERVIEW.md) — Vision, goals, constraints
-- [Architecture](docs/ARCHITECTURE.md) — Technical design, interfaces, data flow
-- [Conventions](docs/CONVENTIONS.md) — Code patterns and contribution guidelines
-- [Input Capture](docs/components/input_capture.md) — Input source module
-- [Gesture Engine](docs/components/gesture_engine.md) — Recognition algorithms
-- [Output Actions](docs/components/output_actions.md) — Action execution module
+| Document | Purpose |
+|----------|---------|
+| [DESIGN_OVERVIEW.md](docs/DESIGN_OVERVIEW.md) | Vision, goals, key design decisions |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical design, trait interfaces, IPC protocol |
+| [CONVENTIONS.md](docs/CONVENTIONS.md) | Code patterns, naming, extension guidelines |
+| [input_capture.md](docs/components/input_capture.md) | Input source module spec |
+| [gesture_engine.md](docs/components/gesture_engine.md) | Recognition algorithm spec |
+| [output_actions.md](docs/components/output_actions.md) | Action execution module spec |
+| [docs/tasks/](docs/tasks/) | Per-task implementation notes and architect review |
 
 ## License
 

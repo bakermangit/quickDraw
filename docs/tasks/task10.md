@@ -40,3 +40,18 @@ Implement audio feedback (success/error sounds) when a gesture is matched or fai
 - Audio plays asynchronously.
 - Missing files do not cause crashes.
 - `audio.enabled = false` correctly mutes all feedback.
+
+---
+
+## Addendum — Architect Review (2026-04-25)
+
+All decisions accepted. One notable scope expansion beyond the original spec.
+
+### Confirmed: PlaySoundW for WAV
+Correct implementation. `SND_ASYNC` ensures it doesn't block the pipeline loop during gesture processing.
+
+### Beyond spec: MCI for MP3/other formats
+The agent added MCI (`mciSendStringW`) support for non-WAV formats (MP3, MIDI, etc.) — this was not in the original spec. It's a reasonable addition: MCI is a standard Win32 API and adds meaningful flexibility. No concerns with the approach, but note that MCI commands are more complex to manage (open/play/close sequence) compared to `PlaySoundW`. If audio ever becomes a source of bugs, this is where to look first.
+
+### Confirmed: Path resolution via get_config_dir()
+Resolving relative sound paths against `get_config_dir()` means portable mode works correctly — sounds placed next to the exe are found automatically.

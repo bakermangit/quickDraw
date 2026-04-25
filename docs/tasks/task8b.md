@@ -14,3 +14,12 @@ Implemented a "portable mode" for QuickDraw configuration. If a `config.toml` fi
 - [x] Placing a `config.toml` next to the exe makes the app use that directory
 - [x] Removing `config.toml` from the exe directory falls back to AppData cleanly
 - [x] Document decisions in `docs/tasks/task8b.md`
+
+---
+
+## Addendum — Architect Review (2026-04-25)
+
+Accepted. Clean, minimal change with good fallback behavior.
+
+### Confirmed: exe-adjacent check first
+Checking for `config.toml` next to the exe before falling back to `%APPDATA%` is the correct priority order. The user explicitly opts into portable mode by placing the file there — no config flag needed. The `tracing::debug!` log line makes it easy to confirm which mode is active during development.

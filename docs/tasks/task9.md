@@ -32,3 +32,18 @@ QuickDraw is a headless daemon. To provide user control without a terminal, a sy
 - The tray icon logic correctly handles menu events and communicates them to the main loop.
 - The "Quit" command terminates the application.
 - The "Configure..." command opens the browser as expected.
+
+---
+
+## Addendum — Architect Review (2026-04-25)
+
+Accepted. Correct use of Win32 message loop on a dedicated OS thread.
+
+### Confirmed: Win32 GetMessageW loop for tray thread
+Using `GetMessageW`/`TranslateMessage`/`DispatchMessageW` on the tray thread is correct — this is what the `tray-icon` crate requires on Windows to process tray events. `blocking_send()` correctly bridges from this synchronous thread into the Tokio runtime.
+
+### Known issue (fixed in task12): "Configure..." closed the app
+The initial `tokio::select!` in `main.rs` was not wrapped in a loop, so receiving *any* `TrayCommand` (including `OpenConfig`) would complete the select and exit main. Fixed in task12 by wrapping in `loop {}` and pinning the pipeline future with `Box::pin`. This is documented in task12.md.
+
+### Note: placeholder icon
+The 16×16 white RGBA icon is a known placeholder. A proper icon asset is a future task.
