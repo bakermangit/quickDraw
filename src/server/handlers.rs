@@ -13,6 +13,7 @@ enum ClientMessage {
     GetConfig,
     ListGestures,
     SaveGesture { gesture: GestureConfig },
+    UpdateGesture { name: String, action: crate::config::ActionConfig, confidence_threshold: Option<f64> },
     DeleteGesture { name: String },
     SetConfig { config: Config },
     StartCapture,
@@ -68,16 +69,23 @@ pub async fn handle_socket(
                             let mut state_guard = state.lock().await;
                             let profile_name = state_guard.config.general.gesture_profile.clone();
                             
-                            let mut found = false;
-                            for existing in &mut state_guard.gesture_profile.gestures {
-                                if existing.name == gesture.name {
-                                    *existing = gesture.clone();
-                                    found = true;
-                                    break;
-                                }
+                            state_guard.gesture_profile.gestures.push(gesture);
+
+                            if let Err(e) = crate::config::save_gesture_profile(&profile_name, &state_guard.gesture_profile) {
+                                let _ = tx.send(ServerMessage::Error { message: e.to_string() }).await;
+                            } else {
+                                let _ = tx.send(ServerMessage::Ok).await;
                             }
-                            if !found {
-                                state_guard.gesture_profile.gestures.push(gesture);
+                        }
+                        ClientMessage::UpdateGesture { name, action, confidence_threshold } => {
+                            let mut state_guard = state.lock().await;
+                            let profile_name = state_guard.config.general.gesture_profile.clone();
+
+                            for g in &mut state_guard.gesture_profile.gestures {
+                                if g.name == name {
+                                    g.action = action.clone();
+                                    g.confidence_threshold = confidence_threshold;
+                                }
                             }
                             
                             if let Err(e) = crate::config::save_gesture_profile(&profile_name, &state_guard.gesture_profile) {

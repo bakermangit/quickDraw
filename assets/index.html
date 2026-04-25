@@ -552,7 +552,24 @@
                 return;
             }
 
+            // Group gestures by name
+            const groups = {};
             gestures.forEach(g => {
+                if (!groups[g.name]) {
+                    groups[g.name] = {
+                        name: g.name,
+                        action: g.action,
+                        confidence_threshold: g.confidence_threshold,
+                        templates: 0
+                    };
+                }
+                groups[g.name].templates++;
+                // Last one wins for display of action/threshold
+                groups[g.name].action = g.action;
+                groups[g.name].confidence_threshold = g.confidence_threshold;
+            });
+
+            Object.values(groups).forEach(g => {
                 const actionStr = formatAction(g.action);
                 const threshStr = g.confidence_threshold !== null ? `(Threshold: ${g.confidence_threshold})` : '';
                 
@@ -560,10 +577,14 @@
                 div.className = 'gesture-item';
                 div.innerHTML = `
                     <div class="gesture-info">
-                        <h3>${g.name}</h3>
+                        <h3>${g.name} <span style="font-size: 12px; background: var(--border-color); padding: 2px 6px; border-radius: 10px; margin-left: 8px;">${g.templates} templates</span></h3>
                         <p>Action: ${actionStr} ${threshStr}</p>
                     </div>
-                    <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="secondary" onclick="addTemplate('${g.name}', '${actionStr}', ${g.confidence_threshold})">Add Template</button>
+                        <button class="secondary" onclick="editGesture('${g.name}', '${actionStr}', ${g.confidence_threshold})">Edit</button>
+                        <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
+                    </div>
                 `;
                 gestureList.appendChild(div);
             });
@@ -580,11 +601,17 @@
         }
 
         // Modal and Recording Logic
+        let isEditing = false;
+        let isAddingTemplate = false;
+
         function startRecording() {
+            isEditing = false;
+            isAddingTemplate = false;
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = true;
+            document.getElementById('save-gest-btn').innerText = 'Save Gesture';
             
             const canvas = document.getElementById('gesture-canvas');
             const ctx = canvas.getContext('2d');
@@ -593,8 +620,51 @@
             ws.send(JSON.stringify({ type: 'start_capture' }));
         }
 
+        function addTemplate(name, actionStr, threshold) {
+            isEditing = false;
+            isAddingTemplate = true;
+            document.getElementById('record-modal').classList.add('active');
+            document.getElementById('waiting-msg').style.display = 'block';
+            document.getElementById('gesture-details').style.display = 'none';
+            document.getElementById('save-gest-btn').disabled = true;
+            document.getElementById('save-gest-btn').innerText = 'Add Template';
+
+            const canvas = document.getElementById('gesture-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            document.getElementById('new-gest-name').value = name;
+            document.getElementById('new-gest-action').value = actionStr;
+            document.getElementById('new-gest-threshold').value = threshold || '';
+
+            ws.send(JSON.stringify({ type: 'start_capture' }));
+        }
+
+        function editGesture(name, actionStr, threshold) {
+            isEditing = true;
+            isAddingTemplate = false;
+            document.getElementById('record-modal').classList.add('active');
+            document.getElementById('waiting-msg').style.display = 'none';
+            document.getElementById('gesture-details').style.display = 'block';
+            document.getElementById('save-gest-btn').disabled = false;
+            document.getElementById('save-gest-btn').innerText = 'Update Gesture';
+
+            // Hide canvas for edit
+            const canvas = document.getElementById('gesture-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.querySelector('.canvas-container').style.display = 'none';
+
+            document.getElementById('new-gest-name').value = name;
+            document.getElementById('new-gest-name').disabled = true;
+            document.getElementById('new-gest-action').value = actionStr;
+            document.getElementById('new-gest-threshold').value = threshold || '';
+        }
+
         function closeModal() {
             document.getElementById('record-modal').classList.remove('active');
+            document.querySelector('.canvas-container').style.display = 'block';
+            document.getElementById('new-gest-name').disabled = false;
             ws.send(JSON.stringify({ type: 'cancel_capture' }));
             pendingCapture = null;
         }
@@ -606,9 +676,11 @@
             document.getElementById('gesture-details').style.display = 'block';
             document.getElementById('save-gest-btn').disabled = false;
             
-            document.getElementById('new-gest-name').value = '';
-            document.getElementById('new-gest-action').value = '';
-            document.getElementById('new-gest-threshold').value = '';
+            if (!isAddingTemplate) {
+                document.getElementById('new-gest-name').value = '';
+                document.getElementById('new-gest-action').value = '';
+                document.getElementById('new-gest-threshold').value = '';
+            }
 
             drawPath(msg.raw.points);
         }
@@ -678,8 +750,6 @@
         }
 
         function saveNewGesture() {
-            if (!pendingCapture) return;
-
             const name = document.getElementById('new-gest-name').value.trim();
             const actionStr = document.getElementById('new-gest-action').value.trim();
             const thresholdStr = document.getElementById('new-gest-threshold').value.trim();
@@ -706,22 +776,32 @@
                 }
             }
 
-            const gestureConfig = {
-                name: name,
-                action: action,
-                sound: null,
-                pattern: {
-                    algorithm: pendingCapture.processed.algorithm,
-                    template_points: pendingCapture.processed.template_points
-                },
-                raw: pendingCapture.raw,
-                confidence_threshold: threshold
-            };
+            if (isEditing) {
+                ws.send(JSON.stringify({
+                    type: 'update_gesture',
+                    name: name,
+                    action: action,
+                    confidence_threshold: threshold
+                }));
+            } else {
+                if (!pendingCapture) return;
+                const gestureConfig = {
+                    name: name,
+                    action: action,
+                    sound: null,
+                    pattern: {
+                        algorithm: pendingCapture.processed.algorithm,
+                        template_points: pendingCapture.processed.template_points
+                    },
+                    raw: pendingCapture.raw,
+                    confidence_threshold: threshold
+                };
 
-            ws.send(JSON.stringify({
-                type: 'save_gesture',
-                gesture: gestureConfig
-            }));
+                ws.send(JSON.stringify({
+                    type: 'save_gesture',
+                    gesture: gestureConfig
+                }));
+            }
 
             closeModal();
         }
