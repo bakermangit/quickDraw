@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickDraw Configuration</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --panel-bg: #252542;
+            --accent-color: #7c6af7;
+            --accent-hover: #6554db;
+            --text-color: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border-color: #38385e;
+            --error-color: #e74c3c;
+            --success-color: #2ecc71;
+            --input-bg: #151525;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            width: 100%;
+            padding: 20px 0;
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            position: relative;
+        }
+
+        .header-content {
+            width: 800px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--error-color);
+        }
+
+        .status-dot.connected {
+            background-color: var(--success-color);
+        }
+
+        main {
+            width: 800px;
+            margin-top: 30px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background-color: var(--panel-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: var(--font-family);
+        }
+
+        .tab.active {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .tab-content {
+            display: none;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0 6px 6px 6px;
+            padding: 30px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .gesture-item {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .gesture-info h3 {
+            margin: 0 0 5px 0;
+            color: var(--accent-color);
+        }
+
+        .gesture-info p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: var(--font-family);
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button.danger {
+            background-color: transparent;
+            color: var(--error-color);
+            border: 1px solid var(--error-color);
+        }
+
+        button.danger:hover {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        button.secondary {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        button.secondary:hover {
+            background-color: var(--border-color);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+        }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: var(--font-family);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input {
+            width: auto;
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background-color: var(--panel-bg);
+            padding: 30px;
+            border-radius: 8px;
+            width: 500px;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal h2 {
+            margin-top: 0;
+        }
+
+        .canvas-container {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            width: 250px;
+            height: 250px;
+            margin: 20px auto;
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .waiting-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-content">
+            <h1>QuickDraw</h1>
+            <div class="status-indicator">
+                <div class="status-dot" id="ws-dot"></div>
+                <span id="ws-text">Disconnected</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('gestures')">Gestures</button>
+            <button class="tab" onclick="switchTab('settings')">Settings</button>
+        </div>
+
+        <div id="gestures-tab" class="tab-content active">
+            <div class="controls">
+                <button onclick="startRecording()">Record New Gesture</button>
+                <button class="secondary" onclick="reloadGestures()">Reload from Disk</button>
+            </div>
+            
+            <div id="gesture-list">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+
+        <div id="settings-tab" class="tab-content">
+            <div class="form-group">
+                <label for="input-method">Input Method</label>
+                <select id="input-method">
+                    <option value="raw_input">Raw Input</option>
+                    <option value="hook">Hook</option>
+                    <option value="polling">Polling</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="recognizer">Recognizer</label>
+                <select id="recognizer">
+                    <option value="dollar_one">$1 Unistroke</option>
+                    <option value="rubine">Rubine</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="confidence">Confidence Threshold (<span id="conf-val">0.80</span>)</label>
+                <input type="range" id="confidence" min="0.5" max="1.0" step="0.01" value="0.8">
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="cursor-reset">
+                <label for="cursor-reset">Cursor Reset</label>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="audio-enabled">
+                <label for="audio-enabled">Audio Enabled</label>
+            </div>
+
+            <h3>Trigger</h3>
+            <div class="form-group">
+                <label for="trigger-type">Trigger Type</label>
+                <select id="trigger-type" onchange="updateTriggerUI()">
+                    <option value="combo">Button Combo</option>
+                    <option value="single">Single Button</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="trigger-btn1">First Button / Key</label>
+                <input type="text" id="trigger-btn1" value="Mouse1">
+            </div>
+
+            <div class="form-group" id="trigger-btn2-group">
+                <label for="trigger-btn2">Second Button (for Combo)</label>
+                <input type="text" id="trigger-btn2" value="Mouse2">
+            </div>
+
+            <button onclick="saveConfig()" style="margin-top: 20px;">Save Settings</button>
+        </div>
+    </main>
+
+    <!-- Recording Modal -->
+    <div id="record-modal" class="modal-overlay">
+        <div class="modal">
+            <h2>Record Gesture</h2>
+            
+            <div class="canvas-container">
+                <div id="waiting-msg" class="waiting-text">Draw your gesture with your configured trigger...</div>
+                <canvas id="gesture-canvas" width="250" height="250"></canvas>
+            </div>
+
+            <div id="gesture-details" style="display: none;">
+                <div class="form-group">
+                    <label for="new-gest-name">Name</label>
+                    <input type="text" id="new-gest-name" placeholder="e.g., flick-up">
+                </div>
+                <div class="form-group">
+                    <label for="new-gest-action">Action</label>
+                    <input type="text" id="new-gest-action" placeholder="e.g., key:F1">
+                </div>
+                <div class="form-group">
+                    <label for="new-gest-threshold">Custom Threshold (Optional)</label>
+                    <input type="number" id="new-gest-threshold" min="0.5" max="1.0" step="0.01" placeholder="Global default">
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeModal()">Cancel</button>
+                <button id="save-gest-btn" onclick="saveNewGesture()" disabled>Save Gesture</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let configData = null;
+        let pendingCapture = null;
+
+        // UI Elements
+        const dot = document.getElementById('ws-dot');
+        const txt = document.getElementById('ws-text');
+        const gestureList = document.getElementById('gesture-list');
+        const confRange = document.getElementById('confidence');
+        const confVal = document.getElementById('conf-val');
+
+        confRange.oninput = function() {
+            confVal.innerText = parseFloat(this.value).toFixed(2);
+        }
+
+        function updateTriggerUI() {
+            const type = document.getElementById('trigger-type').value;
+            const btn2Group = document.getElementById('trigger-btn2-group');
+            if (type === 'combo') {
+                btn2Group.style.display = 'block';
+            } else {
+                btn2Group.style.display = 'none';
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'gestures') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('gestures-tab').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('settings-tab').classList.add('active');
+            }
+        }
+
+        function connect() {
+            ws = new WebSocket('ws://localhost:9876/ws');
+
+            ws.onopen = () => {
+                dot.classList.add('connected');
+                txt.innerText = 'Connected';
+                
+                ws.send(JSON.stringify({ type: 'get_config' }));
+                ws.send(JSON.stringify({ type: 'list_gestures' }));
+            };
+
+            ws.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                console.log("Received:", msg);
+
+                if (msg.type === 'config') {
+                    configData = msg.data;
+                    populateSettings();
+                } else if (msg.type === 'gestures') {
+                    renderGestures(msg.data);
+                } else if (msg.type === 'capture_result') {
+                    handleCaptureResult(msg);
+                } else if (msg.type === 'capture_cancelled') {
+                    closeModal();
+                } else if (msg.type === 'error') {
+                    alert('Error: ' + msg.message);
+                } else if (msg.type === 'ok') {
+                    // Success for save operations, request refresh
+                    ws.send(JSON.stringify({ type: 'get_config' }));
+                    ws.send(JSON.stringify({ type: 'list_gestures' }));
+                }
+            };
+
+            ws.onclose = () => {
+                dot.classList.remove('connected');
+                txt.innerText = 'Disconnected';
+                setTimeout(connect, 2000);
+            };
+
+            ws.onerror = (err) => {
+                console.error("WS Error", err);
+            };
+        }
+
+        function populateSettings() {
+            if (!configData) return;
+            
+            document.getElementById('input-method').value = configData.general.input_method;
+            document.getElementById('recognizer').value = configData.general.recognizer;
+            
+            confRange.value = configData.general.confidence_threshold;
+            confVal.innerText = configData.general.confidence_threshold.toFixed(2);
+            
+            document.getElementById('cursor-reset').checked = configData.general.cursor_reset;
+            document.getElementById('audio-enabled').checked = configData.audio.enabled;
+
+            const trigger = configData.trigger;
+            if (trigger.type === 'combo') {
+                document.getElementById('trigger-type').value = 'combo';
+                document.getElementById('trigger-btn1').value = trigger.key1;
+                document.getElementById('trigger-btn2').value = trigger.key2;
+            } else {
+                document.getElementById('trigger-type').value = 'single';
+                document.getElementById('trigger-btn1').value = trigger.key1;
+            }
+            updateTriggerUI();
+        }
+
+        function saveConfig() {
+            if (!configData) return;
+
+            configData.general.input_method = document.getElementById('input-method').value;
+            configData.general.recognizer = document.getElementById('recognizer').value;
+            configData.general.confidence_threshold = parseFloat(document.getElementById('confidence').value);
+            configData.general.cursor_reset = document.getElementById('cursor-reset').checked;
+            configData.audio.enabled = document.getElementById('audio-enabled').checked;
+
+            const triggerType = document.getElementById('trigger-type').value;
+            if (triggerType === 'combo') {
+                configData.trigger = {
+                    type: 'combo',
+                    key1: document.getElementById('trigger-btn1').value,
+                    key2: document.getElementById('trigger-btn2').value
+                };
+            } else {
+                configData.trigger = {
+                    type: 'single',
+                    key1: document.getElementById('trigger-btn1').value
+                };
+            }
+
+            ws.send(JSON.stringify({
+                type: 'set_config',
+                config: configData
+            }));
+        }
+
+        function formatAction(action) {
+            if (action.type === 'key_press') {
+                let s = `key:${action.key}`;
+                if (action.modifiers && action.modifiers.length > 0) {
+                    s += '+' + action.modifiers.join('+');
+                }
+                return s;
+            }
+            return JSON.stringify(action);
+        }
+
+        function renderGestures(gestures) {
+            gestureList.innerHTML = '';
+            if (gestures.length === 0) {
+                gestureList.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No gestures defined yet.</p>';
+                return;
+            }
+
+            gestures.forEach(g => {
+                const actionStr = formatAction(g.action);
+                const threshStr = g.confidence_threshold !== null ? `(Threshold: ${g.confidence_threshold})` : '';
+                
+                const div = document.createElement('div');
+                div.className = 'gesture-item';
+                div.innerHTML = `
+                    <div class="gesture-info">
+                        <h3>${g.name}</h3>
+                        <p>Action: ${actionStr} ${threshStr}</p>
+                    </div>
+                    <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
+                `;
+                gestureList.appendChild(div);
+            });
+        }
+
+        function deleteGesture(name) {
+            if (confirm(`Delete gesture '${name}'?`)) {
+                ws.send(JSON.stringify({ type: 'delete_gesture', name: name }));
+            }
+        }
+
+        function reloadGestures() {
+            ws.send(JSON.stringify({ type: 'reload' }));
+        }
+
+        // Modal and Recording Logic
+        function startRecording() {
+            document.getElementById('record-modal').classList.add('active');
+            document.getElementById('waiting-msg').style.display = 'block';
+            document.getElementById('gesture-details').style.display = 'none';
+            document.getElementById('save-gest-btn').disabled = true;
+            
+            const canvas = document.getElementById('gesture-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ws.send(JSON.stringify({ type: 'start_capture' }));
+        }
+
+        function closeModal() {
+            document.getElementById('record-modal').classList.remove('active');
+            ws.send(JSON.stringify({ type: 'cancel_capture' }));
+            pendingCapture = null;
+        }
+
+        function handleCaptureResult(msg) {
+            pendingCapture = msg;
+            
+            document.getElementById('waiting-msg').style.display = 'none';
+            document.getElementById('gesture-details').style.display = 'block';
+            document.getElementById('save-gest-btn').disabled = false;
+            
+            document.getElementById('new-gest-name').value = '';
+            document.getElementById('new-gest-action').value = '';
+            document.getElementById('new-gest-threshold').value = '';
+
+            drawPath(msg.raw.points);
+        }
+
+        function drawPath(points) {
+            if (points.length === 0) return;
+
+            const canvas = document.getElementById('gesture-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Find bounds
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            points.forEach(p => {
+                if (p[0] < minX) minX = p[0];
+                if (p[0] > maxX) maxX = p[0];
+                if (p[1] < minY) minY = p[1];
+                if (p[1] > maxY) maxY = p[1];
+            });
+
+            const padding = 20;
+            const size = Math.max(maxX - minX, maxY - minY) || 1;
+            const scale = (canvas.width - padding * 2) / size;
+            
+            const cx = (minX + maxX) / 2;
+            const cy = (minY + maxY) / 2;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#7c6af7';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            points.forEach((p, i) => {
+                const x = (p[0] - cx) * scale + canvas.width / 2;
+                const y = (p[1] - cy) * scale + canvas.height / 2;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+
+            // Draw start point
+            const startP = points[0];
+            const startX = (startP[0] - cx) * scale + canvas.width / 2;
+            const startY = (startP[1] - cy) * scale + canvas.height / 2;
+            
+            ctx.beginPath();
+            ctx.fillStyle = '#2ecc71';
+            ctx.arc(startX, startY, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function parseAction(str) {
+            if (str.startsWith("key:")) {
+                const parts = str.substring(4).split('+');
+                return {
+                    type: "key_press",
+                    key: parts[0],
+                    modifiers: parts.slice(1)
+                };
+            }
+            throw new Error("Invalid action format. Use key:F1 or key:G+Ctrl");
+        }
+
+        function saveNewGesture() {
+            if (!pendingCapture) return;
+
+            const name = document.getElementById('new-gest-name').value.trim();
+            const actionStr = document.getElementById('new-gest-action').value.trim();
+            const thresholdStr = document.getElementById('new-gest-threshold').value.trim();
+
+            if (!name || !actionStr) {
+                alert("Name and Action are required.");
+                return;
+            }
+
+            let action;
+            try {
+                action = parseAction(actionStr);
+            } catch (e) {
+                alert(e.message);
+                return;
+            }
+
+            let threshold = null;
+            if (thresholdStr) {
+                threshold = parseFloat(thresholdStr);
+                if (isNaN(threshold) || threshold < 0.5 || threshold > 1.0) {
+                    alert("Threshold must be between 0.5 and 1.0");
+                    return;
+                }
+            }
+
+            const gestureConfig = {
+                name: name,
+                action: action,
+                sound: null,
+                pattern: {
+                    algorithm: pendingCapture.processed.algorithm,
+                    template_points: pendingCapture.processed.template_points
+                },
+                raw: pendingCapture.raw,
+                confidence_threshold: threshold
+            };
+
+            ws.send(JSON.stringify({
+                type: 'save_gesture',
+                gesture: gestureConfig
+            }));
+
+            closeModal();
+        }
+
+        // Connect on load
+        connect();
+    </script>
+</body>
+</html>
