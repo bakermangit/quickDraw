@@ -33,3 +33,6 @@ name = "fast-circle"
 # ... (action and pattern)
 min_speed_px_per_ms = 2.0
 ```
+
+## Addendum: GUI Integration
+While the backend logic for velocity and path-length constraints is complete, these options are not yet exposed in the web configuration interface. A future task will involve updating the GUI to allow users to configure these min/max thresholds on a per-gesture basis.

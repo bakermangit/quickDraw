@@ -26,3 +26,6 @@ The hook handles the following Win32 messages:
 - `WM_RBUTTONDOWN` / `WM_RBUTTONUP` -> `InputEventType::MouseButton { button: Right }`
 - `WM_MBUTTONDOWN` / `WM_MBUTTONUP` -> `InputEventType::MouseButton { button: Middle }`
 - `WM_XBUTTONDOWN` / `WM_XBUTTONUP` -> `InputEventType::MouseButton { button: X1/X2 }`
+
+## Addendum: Keyboard Input Deprivation
+Because `HookInputSource` exclusively implements `WH_MOUSE_LL`, the pipeline stops receiving `KeyboardKey` events entirely when this method is selected (since the global `RawInputSource` is disabled). A future architectural update will decouple mouse and keyboard input sources, allowing users to configure `mouse_input_method` and `keyboard_input_method` independently.

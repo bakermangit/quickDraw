@@ -27,3 +27,6 @@ The gesture trace overlay is implemented as a lightweight Win32 popup window tha
 - **Virtual Screen**: The overlay covers the entire virtual screen (`SM_XVIRTUALSCREEN`, `SM_YVIRTUALSCREEN`, etc.) to support multi-monitor setups. Coordinates must be offset by the virtual screen origin.
 - **Transparency**: The DIB is cleared to 0 (fully transparent) at the start of each gesture. GDI drawing on the layered window DC must be synchronized using `UpdateLayeredWindow`.
 - **Thread Safety**: `HWND` and other Win32 handles are not inherently `Send`. In Rust, they are wrapped to safely pass between threads where necessary, or kept within the thread that created them.
+
+## Addendum: Trace Finesse and GUI
+A planned iteration will introduce "Trace Finesse" (dynamic stroke width that starts small and grows to a maximum size) to better visualize the gesture's origin and direction. Additionally, the overlay toggle and appearance settings (`trace_color`, min/max width, growth speed) must be exposed in the web configuration GUI.
