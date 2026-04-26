@@ -7,6 +7,7 @@ mod output;
 mod audio;
 mod tray;
 mod server;
+mod ui;
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
