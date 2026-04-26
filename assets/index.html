@@ -295,13 +295,13 @@
 
     <main>
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('gestures')">Gestures</button>
-            <button class="tab" onclick="switchTab('settings')">Settings</button>
+            <button class="tab active" onclick="event.stopPropagation(); switchTab('gestures')">Gestures</button>
+            <button class="tab" onclick="event.stopPropagation(); switchTab('settings')">Settings</button>
         </div>
 
         <div id="gestures-tab" class="tab-content active">
             <div class="controls">
-                <button onclick="startRecording()">Record New Gesture</button>
+                <button onclick="event.stopPropagation(); startRecording()">Record New Gesture</button>
                 <button class="secondary" onclick="reloadGestures()">Reload from Disk</button>
             </div>
             
@@ -601,9 +601,9 @@
                             <p>Action: ${actionStr} ${threshStr}</p>
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button class="secondary" onclick="toggleTemplates('${g.name}')">Templates</button>
-                            <button class="secondary" onclick="addTemplate('${g.name}', '${actionStr}', ${g.confidence_threshold})">Add Template</button>
-                            <button class="secondary" onclick="editGesture('${g.name}', '${actionStr}', ${g.confidence_threshold})">Edit</button>
+                            <button class="secondary" onclick="event.stopPropagation(); toggleTemplates('${g.name}')">Templates</button>
+                            <button class="secondary" onclick="event.stopPropagation(); addTemplate('${g.name}', '${actionStr}', ${g.confidence_threshold})">Add Template</button>
+                            <button class="secondary" onclick="event.stopPropagation(); editGesture('${g.name}', '${actionStr}', ${g.confidence_threshold})">Edit</button>
                             <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
                         </div>
                     </div>
@@ -887,6 +887,13 @@
 
             closeModal();
         }
+
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('record-modal');
+            if (modal.classList.contains('active') && e.target === modal) {
+                closeModal();
+            }
+        });
 
         // Connect on load
         connect();
