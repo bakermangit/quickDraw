@@ -552,21 +552,124 @@
                 return;
             }
 
-            gestures.forEach(g => {
+            // Group gestures by name
+            const groups = {};
+            gestures.forEach((g, index) => {
+                if (!groups[g.name]) {
+                    groups[g.name] = {
+                        name: g.name,
+                        action: g.action,
+                        confidence_threshold: g.confidence_threshold,
+                        templates: []
+                    };
+                }
+                groups[g.name].templates.push({
+                    index: index,
+                    points: g.raw.points
+                });
+                // Last one wins for display of action/threshold
+                groups[g.name].action = g.action;
+                groups[g.name].confidence_threshold = g.confidence_threshold;
+            });
+
+            Object.values(groups).forEach(g => {
                 const actionStr = formatAction(g.action);
                 const threshStr = g.confidence_threshold !== null ? `(Threshold: ${g.confidence_threshold})` : '';
                 
                 const div = document.createElement('div');
                 div.className = 'gesture-item';
+                div.style.flexDirection = 'column';
+                div.style.alignItems = 'stretch';
+
+                let templatesHtml = '';
+                g.templates.forEach((t, i) => {
+                    templatesHtml += `
+                        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--panel-bg); margin-top: 8px; padding: 8px; border-radius: 4px;">
+                            <div style="width: 60px; height: 60px; background: var(--input-bg); border-radius: 4px;">
+                                <canvas id="template-canvas-${t.index}" width="60" height="60"></canvas>
+                            </div>
+                            <span style="font-size: 12px; color: var(--text-muted);">Template #${i+1}</span>
+                            <button class="danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteTemplate(${t.index})">Remove</button>
+                        </div>
+                    `;
+                });
+
                 div.innerHTML = `
-                    <div class="gesture-info">
-                        <h3>${g.name}</h3>
-                        <p>Action: ${actionStr} ${threshStr}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div class="gesture-info">
+                            <h3>${g.name} <span style="font-size: 12px; background: var(--border-color); padding: 2px 6px; border-radius: 10px; margin-left: 8px;">${g.templates.length} templates</span></h3>
+                            <p>Action: ${actionStr} ${threshStr}</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="secondary" onclick="toggleTemplates('${g.name}')">Templates</button>
+                            <button class="secondary" onclick="addTemplate('${g.name}', '${actionStr}', ${g.confidence_threshold})">Add Template</button>
+                            <button class="secondary" onclick="editGesture('${g.name}', '${actionStr}', ${g.confidence_threshold})">Edit</button>
+                            <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
+                        </div>
                     </div>
-                    <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
+                    <div id="templates-container-${g.name}" style="display: none; margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                        ${templatesHtml}
+                    </div>
                 `;
                 gestureList.appendChild(div);
+
+                // Draw each template preview
+                g.templates.forEach(t => {
+                    setTimeout(() => drawPreview(`template-canvas-${t.index}`, t.points), 0);
+                });
             });
+        }
+
+        function toggleTemplates(name) {
+            const container = document.getElementById(`templates-container-${name}`);
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        function drawPreview(canvasId, points) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (points.length === 0) return;
+
+            // Find bounds
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            points.forEach(p => {
+                if (p[0] < minX) minX = p[0];
+                if (p[0] > maxX) maxX = p[0];
+                if (p[1] < minY) minY = p[1];
+                if (p[1] > maxY) maxY = p[1];
+            });
+
+            const padding = 5;
+            const size = Math.max(maxX - minX, maxY - minY) || 1;
+            const scale = (canvas.width - padding * 2) / size;
+
+            const cx = (minX + maxX) / 2;
+            const cy = (minY + maxY) / 2;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#7c6af7';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            points.forEach((p, i) => {
+                const x = (p[0] - cx) * scale + canvas.width / 2;
+                const y = (p[1] - cy) * scale + canvas.height / 2;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+        }
+
+        function deleteTemplate(index) {
+            if (confirm(`Remove this individual template recording?`)) {
+                ws.send(JSON.stringify({ type: 'delete_template', index: index }));
+            }
         }
 
         function deleteGesture(name) {
@@ -580,11 +683,17 @@
         }
 
         // Modal and Recording Logic
+        let isEditing = false;
+        let isAddingTemplate = false;
+
         function startRecording() {
+            isEditing = false;
+            isAddingTemplate = false;
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = true;
+            document.getElementById('save-gest-btn').innerText = 'Save Gesture';
             
             const canvas = document.getElementById('gesture-canvas');
             const ctx = canvas.getContext('2d');
@@ -593,8 +702,51 @@
             ws.send(JSON.stringify({ type: 'start_capture' }));
         }
 
+        function addTemplate(name, actionStr, threshold) {
+            isEditing = false;
+            isAddingTemplate = true;
+            document.getElementById('record-modal').classList.add('active');
+            document.getElementById('waiting-msg').style.display = 'block';
+            document.getElementById('gesture-details').style.display = 'none';
+            document.getElementById('save-gest-btn').disabled = true;
+            document.getElementById('save-gest-btn').innerText = 'Add Template';
+
+            const canvas = document.getElementById('gesture-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            document.getElementById('new-gest-name').value = name;
+            document.getElementById('new-gest-action').value = actionStr;
+            document.getElementById('new-gest-threshold').value = threshold || '';
+
+            ws.send(JSON.stringify({ type: 'start_capture' }));
+        }
+
+        function editGesture(name, actionStr, threshold) {
+            isEditing = true;
+            isAddingTemplate = false;
+            document.getElementById('record-modal').classList.add('active');
+            document.getElementById('waiting-msg').style.display = 'none';
+            document.getElementById('gesture-details').style.display = 'block';
+            document.getElementById('save-gest-btn').disabled = false;
+            document.getElementById('save-gest-btn').innerText = 'Update Gesture';
+
+            // Hide canvas for edit
+            const canvas = document.getElementById('gesture-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.querySelector('.canvas-container').style.display = 'none';
+
+            document.getElementById('new-gest-name').value = name;
+            document.getElementById('new-gest-name').disabled = true;
+            document.getElementById('new-gest-action').value = actionStr;
+            document.getElementById('new-gest-threshold').value = threshold || '';
+        }
+
         function closeModal() {
             document.getElementById('record-modal').classList.remove('active');
+            document.querySelector('.canvas-container').style.display = 'block';
+            document.getElementById('new-gest-name').disabled = false;
             ws.send(JSON.stringify({ type: 'cancel_capture' }));
             pendingCapture = null;
         }
@@ -606,9 +758,11 @@
             document.getElementById('gesture-details').style.display = 'block';
             document.getElementById('save-gest-btn').disabled = false;
             
-            document.getElementById('new-gest-name').value = '';
-            document.getElementById('new-gest-action').value = '';
-            document.getElementById('new-gest-threshold').value = '';
+            if (!isAddingTemplate) {
+                document.getElementById('new-gest-name').value = '';
+                document.getElementById('new-gest-action').value = '';
+                document.getElementById('new-gest-threshold').value = '';
+            }
 
             drawPath(msg.raw.points);
         }
@@ -678,8 +832,6 @@
         }
 
         function saveNewGesture() {
-            if (!pendingCapture) return;
-
             const name = document.getElementById('new-gest-name').value.trim();
             const actionStr = document.getElementById('new-gest-action').value.trim();
             const thresholdStr = document.getElementById('new-gest-threshold').value.trim();
@@ -706,22 +858,32 @@
                 }
             }
 
-            const gestureConfig = {
-                name: name,
-                action: action,
-                sound: null,
-                pattern: {
-                    algorithm: pendingCapture.processed.algorithm,
-                    template_points: pendingCapture.processed.template_points
-                },
-                raw: pendingCapture.raw,
-                confidence_threshold: threshold
-            };
+            if (isEditing) {
+                ws.send(JSON.stringify({
+                    type: 'update_gesture',
+                    name: name,
+                    action: action,
+                    confidence_threshold: threshold
+                }));
+            } else {
+                if (!pendingCapture) return;
+                const gestureConfig = {
+                    name: name,
+                    action: action,
+                    sound: null,
+                    pattern: {
+                        algorithm: pendingCapture.processed.algorithm,
+                        template_points: pendingCapture.processed.template_points
+                    },
+                    raw: pendingCapture.raw,
+                    confidence_threshold: threshold
+                };
 
-            ws.send(JSON.stringify({
-                type: 'save_gesture',
-                gesture: gestureConfig
-            }));
+                ws.send(JSON.stringify({
+                    type: 'save_gesture',
+                    gesture: gestureConfig
+                }));
+            }
 
             closeModal();
         }

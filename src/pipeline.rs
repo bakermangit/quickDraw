@@ -242,17 +242,20 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
     let mut gesture_configs = HashMap::new();
 
     for gesture in profile.gestures {
+        let name = gesture.name.clone();
         let template_points = gesture.pattern.template_points.iter().map(|p| (p[0], p[1])).collect();
-        let template = GestureTemplate {
-            name: gesture.name.clone(),
+
+        // Every template is added to the recognizer's pool
+        templates.push(GestureTemplate {
+            name: name.clone(),
             template_points,
             algorithm: gesture.pattern.algorithm.clone(),
-        };
-        templates.push(template);
+        });
 
+        // Last occurrence wins for actions and config overrides
         let action = create_action(&gesture.action)?;
-        actions.insert(gesture.name.clone(), action);
-        gesture_configs.insert(gesture.name.clone(), gesture);
+        actions.insert(name.clone(), action);
+        gesture_configs.insert(name, gesture);
     }
 
     let trigger = TriggerDetector::new(config.trigger.clone());
