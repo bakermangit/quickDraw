@@ -31,6 +31,7 @@ pub enum TriggerSignal {
 
 pub struct CaptureRequest {
     pub result_tx: oneshot::Sender<CaptureResult>,
+    pub cancel_rx: oneshot::Receiver<()>,
 }
 
 pub struct CaptureResult {
@@ -280,13 +281,13 @@ impl Pipeline {
         self.input_source.start(tx)?;
 
         let mut accumulator = GestureAccumulator::new();
-        let mut active_capture_request: Option<oneshot::Sender<CaptureResult>> = None;
+        let mut active_capture_request: Option<(oneshot::Sender<CaptureResult>, oneshot::Receiver<()>)> = None;
 
         loop {
             tokio::select! {
                 Some(req) = self.capture_request_rx.recv() => {
                     tracing::info!("Received capture request, entering capture mode");
-                    active_capture_request = Some(req.result_tx);
+                    active_capture_request = Some((req.result_tx, req.cancel_rx));
                 }
                 Some(event) = rx.recv() => {
                     let signal = self.trigger.process(&event);
@@ -307,15 +308,20 @@ impl Pipeline {
                             let origin_pos = accumulator.origin_pos;
                             let capture = accumulator.finish();
 
-                            if let Some(result_tx) = active_capture_request.take() {
-                                // We are in capture mode. Create template and send back result.
-                                tracing::info!("Capture completed, sending result to UI");
-                                let template = self.recognizer.create_template("".to_string(), &capture);
-                                let result = CaptureResult {
-                                    raw: capture,
-                                    template,
-                                };
-                                let _ = result_tx.send(result);
+                            if let Some((result_tx, mut cancel_rx)) = active_capture_request.take() {
+                                // Check if capture was cancelled
+                                if cancel_rx.try_recv().is_ok() {
+                                    tracing::info!("Capture was cancelled, discarding result");
+                                } else {
+                                    // We are in capture mode. Create template and send back result.
+                                    tracing::info!("Capture completed, sending result to UI");
+                                    let template = self.recognizer.create_template("".to_string(), &capture);
+                                    let result = CaptureResult {
+                                        raw: capture,
+                                        template,
+                                    };
+                                    let _ = result_tx.send(result);
+                                }
                             } else {
                                 // Normal recognition mode.
                                 if let Some(match_result) = self.recognizer.recognize(&capture, &self.templates) {

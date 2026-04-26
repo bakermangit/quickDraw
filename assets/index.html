@@ -460,7 +460,13 @@
                 } else if (msg.type === 'capture_result') {
                     handleCaptureResult(msg);
                 } else if (msg.type === 'capture_cancelled') {
-                    closeModal();
+                    // Only close the modal if we were actively capturing.
+                    // Stale cancel_cancelled echoes (from a previous closeModal)
+                    // must not close a freshly opened modal.
+                    if (isCapturing) {
+                        isCapturing = false;
+                        closeModal();
+                    }
                 } else if (msg.type === 'error') {
                     alert('Error: ' + msg.message);
                 } else if (msg.type === 'ok') {
@@ -685,26 +691,29 @@
         // Modal and Recording Logic
         let isEditing = false;
         let isAddingTemplate = false;
+        let isCapturing = false;  // true only while actively waiting for a gesture from the daemon
 
         function startRecording() {
             isEditing = false;
             isAddingTemplate = false;
+            isCapturing = true;
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = true;
             document.getElementById('save-gest-btn').innerText = 'Save Gesture';
-            
+
             const canvas = document.getElementById('gesture-canvas');
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
+
             ws.send(JSON.stringify({ type: 'start_capture' }));
         }
 
         function addTemplate(name, actionStr, threshold) {
             isEditing = false;
             isAddingTemplate = true;
+            isCapturing = true;
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
@@ -725,6 +734,7 @@
         function editGesture(name, actionStr, threshold) {
             isEditing = true;
             isAddingTemplate = false;
+            isCapturing = false;  // edit mode never starts a capture
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'none';
             document.getElementById('gesture-details').style.display = 'block';
@@ -747,13 +757,20 @@
             document.getElementById('record-modal').classList.remove('active');
             document.querySelector('.canvas-container').style.display = 'block';
             document.getElementById('new-gest-name').disabled = false;
-            ws.send(JSON.stringify({ type: 'cancel_capture' }));
+            // Only send cancel_capture if we were actually waiting for one.
+            // Sending it from edit mode (or when already idle) creates a stale
+            // capture_cancelled echo that closes the next modal open immediately.
+            if (isCapturing) {
+                ws.send(JSON.stringify({ type: 'cancel_capture' }));
+            }
+            isCapturing = false;
             pendingCapture = null;
         }
 
         function handleCaptureResult(msg) {
             pendingCapture = msg;
-            
+            isCapturing = false;  // gesture received, no longer waiting for capture
+
             document.getElementById('waiting-msg').style.display = 'none';
             document.getElementById('gesture-details').style.display = 'block';
             document.getElementById('save-gest-btn').disabled = false;
