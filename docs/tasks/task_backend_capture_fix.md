@@ -28,3 +28,61 @@ In `src/server/handlers.rs`:
 - The pipeline correctly clears its capture state when notified of cancellation.
 - No spurious `capture_cancelled` messages are sent upon starting a second capture after a cancellation.
 - `cargo check` and `cargo test` pass.
+
+---
+
+## Addendum — Further Fixes (2026-04-26)
+
+Jules' initial fix correctly restructured the cancel handshake (cancel_rx in CaptureRequest, pipeline checks try_recv in GestureComplete). However the spurious `capture_cancelled` on second open persisted because of two remaining issues.
+
+### Additional fix 1: `was_aborted` flag in handlers.rs
+
+**Problem**: When `abort_rx` fires (intentional cancel), the spawned waiter task sends `cancel_tx` to notify the pipeline. Shortly after, the pipeline receives the *next* `StartCapture` request and overwrites `active_capture_request` — this drops the old `result_tx`, which closes the old `res_rx`. The spawned task's `res_rx` returns `Err(_)`. The `Err` arm unconditionally sent `CaptureCancelled` to the UI — which hit the newly opened modal.
+
+**Fix**: Added `Arc<AtomicBool> was_aborted` shared between the `abort_rx` arm and the `Err` arm. The abort arm sets it to `true` before exiting. The `Err` arm checks it and stays silent if the task was intentionally aborted.
+
+```rust
+let was_aborted = Arc::new(AtomicBool::new(false));
+let was_aborted_clone = was_aborted.clone();
+
+tokio::spawn(async move {
+    tokio::select! {
+        _ = &mut abort_rx => {
+            was_aborted_clone.store(true, Ordering::SeqCst);
+            let _ = cancel_tx.send(());
+        }
+        res = res_rx => {
+            match res {
+                Ok(result) => { /* send CaptureResult */ }
+                Err(_) => {
+                    if !was_aborted.load(Ordering::SeqCst) {
+                        let _ = tx_clone.send(ServerMessage::CaptureCancelled).await;
+                    }
+                }
+            }
+        }
+    }
+});
+```
+
+### Additional fix 2: UI stale echo bug (root cause of the visible symptom)
+
+**Problem**: Even after the backend fixes, the modal still closed immediately on second open. The root cause was in `assets/index.html`:
+
+- `closeModal()` always sent `cancel_capture` — including when closing from **Edit mode**, which never started a capture
+- The server responded with `capture_cancelled` for every `cancel_capture` received
+- The `capture_cancelled` message handler unconditionally called `closeModal()`
+- The response arrived ~5ms after the next modal opened → closed the fresh modal
+
+**Fix**: Added `isCapturing` boolean flag to the UI, tracking whether we are actively waiting for a gesture from the pipeline:
+- `startRecording()` and `addTemplate()` set `isCapturing = true` (they send `start_capture`)
+- `editGesture()` sets `isCapturing = false` (no capture started)
+- `handleCaptureResult()` sets `isCapturing = false` (capture completed)
+- `closeModal()` only sends `cancel_capture` if `isCapturing` is true
+- The `capture_cancelled` message handler only calls `closeModal()` if `isCapturing` is true
+
+This prevents Edit mode from generating stale echoes entirely, and makes the handler ignore any stale echoes that arrive after the modal has already been closed and reopened.
+
+### Summary of final state
+Both the backend race condition and the UI stale-echo bug are required fixes — neither alone solved the problem. The backend fix ensures correct pipeline state; the UI fix ensures stale WebSocket responses don't act on the wrong modal lifecycle state.
+

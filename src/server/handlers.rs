@@ -1,6 +1,7 @@
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::config::{Config, GestureConfig};
@@ -138,7 +139,9 @@ pub async fn handle_socket(
                             }
                         }
                         ClientMessage::StartCapture => {
-                            // Ensure any previous capture is cancelled
+                            // Drop any existing abort sender — the old spawned task will see
+                            // abort_rx closed and exit cleanly without sending CaptureCancelled
+                            // (because was_aborted will be true).
                             let _ = current_capture.take();
 
                             let (res_tx, res_rx) = oneshot::channel();
@@ -148,12 +151,22 @@ pub async fn handle_socket(
                                 let tx_clone = tx.clone();
                                 let (abort_tx, mut abort_rx) = oneshot::channel::<()>();
                                 current_capture = Some(abort_tx);
-                                
+
+                                // Shared flag: true if this task was intentionally aborted.
+                                // Prevents the Err(_) arm from sending CaptureCancelled
+                                // after the sender is dropped because of an intentional cancel.
+                                let was_aborted = Arc::new(AtomicBool::new(false));
+                                let was_aborted_clone = was_aborted.clone();
+
                                 tokio::spawn(async move {
                                     tokio::select! {
                                         _ = &mut abort_rx => {
-                                            // Aborted! Notify pipeline.
+                                            // Intentionally aborted: signal the pipeline and
+                                            // set flag so the Err arm below won't fire.
+                                            was_aborted_clone.store(true, Ordering::SeqCst);
                                             let _ = cancel_tx.send(());
+                                            // Don't send CaptureCancelled here — CancelCapture
+                                            // handler already sent it.
                                         }
                                         res = res_rx => {
                                             match res {
@@ -164,7 +177,11 @@ pub async fn handle_socket(
                                                     }).await;
                                                 }
                                                 Err(_) => {
-                                                    let _ = tx_clone.send(ServerMessage::CaptureCancelled).await;
+                                                    // result_tx was dropped — only send CaptureCancelled
+                                                    // if this wasn't an intentional abort.
+                                                    if !was_aborted.load(Ordering::SeqCst) {
+                                                        let _ = tx_clone.send(ServerMessage::CaptureCancelled).await;
+                                                    }
                                                 }
                                             }
                                         }
