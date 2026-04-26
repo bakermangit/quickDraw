@@ -7,11 +7,12 @@ use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
 
 use crate::config::{Config, TriggerConfig, GestureConfig};
 use crate::types::{GestureCapture, InputEvent, InputEventType, MouseButton};
-use crate::input::{InputSource, raw_input::RawInputSource};
+use crate::input::{InputSource, raw_input::RawInputSource, hook::HookInputSource};
 use crate::gesture::{GestureRecognizer, dollar_one::DollarOneRecognizer};
 use crate::types::GestureTemplate;
 use crate::output::{OutputAction, create_action};
 use crate::audio::AudioPlayer;
+use crate::ui::trace::{TraceOverlay, TraceCommand};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TriggerState {
@@ -243,11 +244,13 @@ pub struct Pipeline {
     audio: AudioPlayer,
     config: Config,
     capture_request_rx: mpsc::Receiver<CaptureRequest>,
+    trace_overlay: Option<TraceOverlay>,
 }
 
 pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<CaptureRequest>) -> Result<Pipeline> {
     let input_source: Box<dyn InputSource> = match config.general.input_method.as_str() {
         "raw_input" => Box::new(RawInputSource::new()),
+        "hook" => Box::new(HookInputSource::new()),
         other => return Err(anyhow!("Unknown input method: {}", other)),
     };
 
@@ -282,6 +285,12 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
     let trigger = TriggerDetector::new(config.trigger.clone());
     let audio = AudioPlayer::new(config.audio.clone());
 
+    let trace_overlay = if config.general.trace_overlay_enabled {
+        Some(TraceOverlay::new(config.general.trace_color.clone()))
+    } else {
+        None
+    };
+
     Ok(Pipeline {
         input_source,
         recognizer,
@@ -292,6 +301,7 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
         audio,
         config,
         capture_request_rx,
+        trace_overlay,
     })
 }
 
@@ -320,13 +330,22 @@ impl Pipeline {
                                 origin = o;
                             }
                             accumulator.start(origin);
+                            if let Some(overlay) = &self.trace_overlay {
+                                overlay.send(TraceCommand::Begin(origin.0, origin.1));
+                            }
                         }
                         TriggerSignal::GesturePoint(dx, dy) => {
                             accumulator.add_point(dx, dy);
+                            if let Some(overlay) = &self.trace_overlay {
+                                overlay.send(TraceCommand::AddPoint(accumulator.origin_pos.0 + accumulator.current_x, accumulator.origin_pos.1 + accumulator.current_y));
+                            }
                         }
                         TriggerSignal::GestureComplete => {
                             let origin_pos = accumulator.origin_pos;
                             let capture = accumulator.finish();
+                            if let Some(overlay) = &self.trace_overlay {
+                                overlay.send(TraceCommand::End);
+                            }
 
                             if let Some((result_tx, mut cancel_rx)) = active_capture_request.take() {
                                 // Check if capture was cancelled
@@ -444,12 +463,21 @@ impl Pipeline {
                         origin = o;
                     }
                     accumulator.start(origin);
+                    if let Some(overlay) = &self.trace_overlay {
+                        overlay.send(TraceCommand::Begin(origin.0, origin.1));
+                    }
                 }
                 TriggerSignal::GesturePoint(dx, dy) => {
                     accumulator.add_point(dx, dy);
+                    if let Some(overlay) = &self.trace_overlay {
+                        overlay.send(TraceCommand::AddPoint(accumulator.origin_pos.0 + accumulator.current_x, accumulator.origin_pos.1 + accumulator.current_y));
+                    }
                 }
                 TriggerSignal::GestureComplete => {
                     let capture = accumulator.finish();
+                    if let Some(overlay) = &self.trace_overlay {
+                        overlay.send(TraceCommand::End);
+                    }
 
                     let template = self.recognizer.create_template(name.clone(), &capture);
                     let action = crate::config::parse_action_str(&action_str)?;

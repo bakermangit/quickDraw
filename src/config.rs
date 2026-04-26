@@ -22,6 +22,8 @@ impl Default for Config {
                 confidence_threshold: 0.80,
                 gesture_profile: "default".to_string(),
                 cursor_reset: true,
+                trace_overlay_enabled: true,
+                trace_color: "#BE5103".to_string(),
             },
             trigger: TriggerConfig::Combo {
                 key1: "Mouse1".to_string(),
@@ -49,6 +51,8 @@ pub struct GeneralConfig {
     pub confidence_threshold: f64,
     pub gesture_profile: String,
     pub cursor_reset: bool,
+    pub trace_overlay_enabled: bool,
+    pub trace_color: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
