@@ -3,6 +3,7 @@ use anyhow::Result;
 use crate::types::InputEvent;
 
 pub mod raw_input;
+pub mod hook;
 
 pub trait InputSource: Send + 'static {
     /// Start capturing input. Sends events through the provided channel.
