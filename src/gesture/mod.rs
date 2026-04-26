@@ -1,4 +1,5 @@
 pub mod dollar_one;
+pub mod rubine;
 
 use crate::types::{GestureCapture, GestureMatch, GestureTemplate};
 

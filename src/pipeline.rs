@@ -8,7 +8,7 @@ use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
 use crate::config::{Config, TriggerConfig, GestureConfig};
 use crate::types::{GestureCapture, InputEvent, InputEventType, MouseButton};
 use crate::input::{InputSource, raw_input::RawInputSource};
-use crate::gesture::{GestureRecognizer, dollar_one::DollarOneRecognizer};
+use crate::gesture::{GestureRecognizer, dollar_one::DollarOneRecognizer, rubine::RubineRecognizer};
 use crate::types::GestureTemplate;
 use crate::output::{OutputAction, create_action};
 use crate::audio::AudioPlayer;
@@ -233,6 +233,7 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
 
     let recognizer: Box<dyn GestureRecognizer> = match config.general.recognizer.as_str() {
         "dollar_one" => Box::new(DollarOneRecognizer::new()),
+        "rubine" => Box::new(RubineRecognizer::new()),
         other => return Err(anyhow!("Unknown recognizer: {}", other)),
     };
 
@@ -247,11 +248,20 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
         let template_points = gesture.pattern.template_points.iter().map(|p| (p[0], p[1])).collect();
 
         // Every template is added to the recognizer's pool
-        templates.push(GestureTemplate {
+        let mut template = GestureTemplate {
             name: name.clone(),
             template_points,
             algorithm: gesture.pattern.algorithm.clone(),
-        });
+            features: None,
+        };
+
+        // If the recognizer is Rubine, we MUST have features.
+        // If they aren't in the profile, we can extract them now from the 'raw' capture.
+        if template.algorithm == "rubine" {
+            template.features = Some(RubineRecognizer::extract_features(&gesture.raw).to_vec());
+        }
+
+        templates.push(template);
 
         // Last occurrence wins for actions and config overrides
         let action = create_action(&gesture.action)?;
