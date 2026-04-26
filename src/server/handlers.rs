@@ -138,8 +138,13 @@ pub async fn handle_socket(
                             }
                         }
                         ClientMessage::StartCapture => {
+                            // Ensure any previous capture is cancelled
+                            let _ = current_capture.take();
+
                             let (res_tx, res_rx) = oneshot::channel();
-                            if capture_tx.send(CaptureRequest { result_tx: res_tx }).await.is_ok() {
+                            let (cancel_tx, cancel_rx) = oneshot::channel();
+
+                            if capture_tx.send(CaptureRequest { result_tx: res_tx, cancel_rx }).await.is_ok() {
                                 let tx_clone = tx.clone();
                                 let (abort_tx, mut abort_rx) = oneshot::channel::<()>();
                                 current_capture = Some(abort_tx);
@@ -147,7 +152,8 @@ pub async fn handle_socket(
                                 tokio::spawn(async move {
                                     tokio::select! {
                                         _ = &mut abort_rx => {
-                                            // aborted
+                                            // Aborted! Notify pipeline.
+                                            let _ = cancel_tx.send(());
                                         }
                                         res = res_rx => {
                                             match res {
