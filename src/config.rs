@@ -22,8 +22,8 @@ impl Default for Config {
                 confidence_threshold: 0.80,
                 gesture_profile: "default".to_string(),
                 cursor_reset: true,
-                trace_overlay_enabled: false,
-                trace_color: "#00FF00".to_string(),
+                trace_overlay_enabled: true,
+                trace_color: "#BE5103".to_string(),
             },
             trigger: TriggerConfig::Combo {
                 key1: "Mouse1".to_string(),
