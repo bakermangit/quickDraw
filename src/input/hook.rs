@@ -30,8 +30,16 @@ static SHOULD_BLOCK: AtomicBool = AtomicBool::new(false);
 static LAST_X: AtomicI32 = AtomicI32::new(0);
 #[cfg(windows)]
 static LAST_Y: AtomicI32 = AtomicI32::new(0);
+
 #[cfg(windows)]
-static HOOK_HANDLE: OnceLock<HHOOK> = OnceLock::new();
+struct SendHhook(HHOOK);
+#[cfg(windows)]
+unsafe impl Send for SendHhook {}
+#[cfg(windows)]
+unsafe impl Sync for SendHhook {}
+
+#[cfg(windows)]
+static HOOK_HANDLE: OnceLock<SendHhook> = OnceLock::new();
 
 pub struct HookInputSource {
     thread_handle: Option<JoinHandle<()>>,
@@ -83,7 +91,7 @@ impl InputSource for HookInputSource {
                         0,
                     ).expect("Failed to install mouse hook");
 
-                    let _ = HOOK_HANDLE.set(hook);
+                    let _ = HOOK_HANDLE.set(SendHhook(hook));
 
                     let mut msg = MSG::default();
                     while GetMessageW(&mut msg, HWND::default(), 0, 0).into() {
