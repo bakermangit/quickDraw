@@ -98,6 +98,10 @@ pub struct GestureConfig {
     pub pattern: GesturePatternConfig,
     pub raw: GestureCapture,
     pub confidence_threshold: Option<f64>,
+    pub min_speed_px_per_ms: Option<f64>,
+    pub max_speed_px_per_ms: Option<f64>,
+    pub min_path_length_px: Option<f64>,
+    pub max_path_length_px: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

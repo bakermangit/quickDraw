@@ -213,6 +213,26 @@ impl GestureAccumulator {
     }
 }
 
+fn compute_path_length(capture: &GestureCapture) -> f64 {
+    let mut length = 0.0;
+    for i in 1..capture.points.len() {
+        let (x1, y1) = capture.points[i - 1];
+        let (x2, y2) = capture.points[i];
+        length += ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt();
+    }
+    length
+}
+
+fn compute_speed(capture: &GestureCapture) -> f64 {
+    let length = compute_path_length(capture);
+    let duration = capture.timestamps.last().copied().unwrap_or(0);
+    if duration == 0 {
+        0.0
+    } else {
+        length / duration as f64
+    }
+}
+
 pub struct Pipeline {
     input_source: Box<dyn InputSource>,
     recognizer: Box<dyn GestureRecognizer>,
@@ -333,16 +353,51 @@ impl Pipeline {
                                         .unwrap_or(self.config.general.confidence_threshold);
 
                                     if confidence >= threshold {
-                                        tracing::info!("Gesture matched: {} (confidence: {:.2})", gesture_id, confidence);
-                                        
-                                        let sound_override = self.gesture_configs.get(gesture_id)
-                                            .and_then(|g| g.sound.as_deref());
-                                        self.audio.play_success(sound_override);
+                                        let path_length = compute_path_length(&capture);
+                                        let speed = compute_speed(&capture);
 
-                                        if let Some(action) = self.actions.get(gesture_id) {
-                                            if let Err(e) = action.execute() {
-                                                tracing::error!("Action execution failed: {}", e);
+                                        let mut constraints_ok = true;
+                                        if let Some(config) = self.gesture_configs.get(gesture_id) {
+                                            if let Some(min_len) = config.min_path_length_px {
+                                                if path_length < min_len {
+                                                    tracing::warn!("Gesture '{}' length {:.1}px below min {:.1}px", gesture_id, path_length, min_len);
+                                                    constraints_ok = false;
+                                                }
                                             }
+                                            if let Some(max_len) = config.max_path_length_px {
+                                                if path_length > max_len {
+                                                    tracing::warn!("Gesture '{}' length {:.1}px above max {:.1}px", gesture_id, path_length, max_len);
+                                                    constraints_ok = false;
+                                                }
+                                            }
+                                            if let Some(min_speed) = config.min_speed_px_per_ms {
+                                                if speed < min_speed {
+                                                    tracing::warn!("Gesture '{}' speed {:.2}px/ms below min {:.2}px/ms", gesture_id, speed, min_speed);
+                                                    constraints_ok = false;
+                                                }
+                                            }
+                                            if let Some(max_speed) = config.max_speed_px_per_ms {
+                                                if speed > max_speed {
+                                                    tracing::warn!("Gesture '{}' speed {:.2}px/ms above max {:.2}px/ms", gesture_id, speed, max_speed);
+                                                    constraints_ok = false;
+                                                }
+                                            }
+                                        }
+
+                                        if constraints_ok {
+                                            tracing::info!("Gesture matched: {} (confidence: {:.2})", gesture_id, confidence);
+
+                                            let sound_override = self.gesture_configs.get(gesture_id)
+                                                .and_then(|g| g.sound.as_deref());
+                                            self.audio.play_success(sound_override);
+
+                                            if let Some(action) = self.actions.get(gesture_id) {
+                                                if let Err(e) = action.execute() {
+                                                    tracing::error!("Action execution failed: {}", e);
+                                                }
+                                            }
+                                        } else {
+                                            self.audio.play_error();
                                         }
                                     } else {
                                         tracing::warn!("Gesture '{}' matched at {:.2} but below threshold {:.2}, ignoring", gesture_id, confidence, threshold);
@@ -412,6 +467,10 @@ impl Pipeline {
                         pattern,
                         raw: capture,
                         confidence_threshold: None,
+                        min_speed_px_per_ms: None,
+                        max_speed_px_per_ms: None,
+                        min_path_length_px: None,
+                        max_path_length_px: None,
                     };
 
                     let mut profile = crate::config::load_gesture_profile(&self.config.general.gesture_profile)?;
@@ -502,5 +561,46 @@ mod tests {
         let signal = detector.process(&m1_up);
         assert!(matches!(signal, TriggerSignal::Pass(_)));
         assert_eq!(detector.state, TriggerState::Idle);
+    }
+
+    #[test]
+    fn test_compute_path_length() {
+        let capture = GestureCapture {
+            points: vec![(0.0, 0.0), (3.0, 4.0), (3.0, 0.0)],
+            timestamps: vec![0, 10, 20],
+        };
+        // distance((0,0), (3,4)) = 5
+        // distance((3,4), (3,0)) = 4
+        // total = 9
+        assert_eq!(compute_path_length(&capture), 9.0);
+
+        let empty_capture = GestureCapture {
+            points: vec![],
+            timestamps: vec![],
+        };
+        assert_eq!(compute_path_length(&empty_capture), 0.0);
+
+        let single_point = GestureCapture {
+            points: vec![(10.0, 10.0)],
+            timestamps: vec![100],
+        };
+        assert_eq!(compute_path_length(&single_point), 0.0);
+    }
+
+    #[test]
+    fn test_compute_speed() {
+        let capture = GestureCapture {
+            points: vec![(0.0, 0.0), (10.0, 0.0)],
+            timestamps: vec![0, 100],
+        };
+        // length = 10, duration = 100
+        // speed = 10 / 100 = 0.1
+        assert_eq!(compute_speed(&capture), 0.1);
+
+        let zero_duration = GestureCapture {
+            points: vec![(0.0, 0.0), (10.0, 0.0)],
+            timestamps: vec![0, 0],
+        };
+        assert_eq!(compute_speed(&zero_duration), 0.0);
     }
 }
