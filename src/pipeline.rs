@@ -7,7 +7,7 @@ use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
 
 use crate::config::{Config, TriggerConfig, GestureConfig};
 use crate::types::{GestureCapture, InputEvent, InputEventType, MouseButton};
-use crate::input::{InputSource, raw_input::RawInputSource};
+use crate::input::{InputSource, raw_input::RawInputSource, hook::HookInputSource};
 use crate::gesture::{GestureRecognizer, dollar_one::DollarOneRecognizer};
 use crate::types::GestureTemplate;
 use crate::output::{OutputAction, create_action};
@@ -230,6 +230,7 @@ pub struct Pipeline {
 pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<CaptureRequest>) -> Result<Pipeline> {
     let input_source: Box<dyn InputSource> = match config.general.input_method.as_str() {
         "raw_input" => Box::new(RawInputSource::new()),
+        "hook" => Box::new(HookInputSource::new()),
         other => return Err(anyhow!("Unknown input method: {}", other)),
     };
 
