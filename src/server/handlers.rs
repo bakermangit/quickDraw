@@ -14,7 +14,7 @@ enum ClientMessage {
     GetConfig,
     ListGestures,
     SaveGesture { gesture: GestureConfig },
-    UpdateGesture { name: String, action: crate::config::ActionConfig, confidence_threshold: Option<f64> },
+    UpdateGesture { old_name: String, new_name: String, action: crate::config::ActionConfig, confidence_threshold: Option<f64> },
     DeleteGesture { name: String },
     DeleteTemplate { index: usize },
     SetConfig { config: Config },
@@ -93,12 +93,13 @@ pub async fn handle_socket(
                                 let _ = tx.send(ServerMessage::Error { message: "Invalid template index".to_string() }).await;
                             }
                         }
-                        ClientMessage::UpdateGesture { name, action, confidence_threshold } => {
+                        ClientMessage::UpdateGesture { old_name, new_name, action, confidence_threshold } => {
                             let mut state_guard = state.lock().await;
                             let profile_name = state_guard.config.general.gesture_profile.clone();
 
                             for g in &mut state_guard.gesture_profile.gestures {
-                                if g.name == name {
+                                if g.name == old_name {
+                                    g.name = new_name.clone();
                                     g.action = action.clone();
                                     g.confidence_threshold = confidence_threshold;
                                 }

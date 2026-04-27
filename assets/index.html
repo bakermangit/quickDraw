@@ -369,7 +369,7 @@
     <!-- Recording Modal -->
     <div id="record-modal" class="modal-overlay">
         <div class="modal">
-            <h2>Record Gesture</h2>
+            <h2 id="modal-title">Record Gesture</h2>
             
             <div class="canvas-container">
                 <div id="waiting-msg" class="waiting-text">Draw your gesture with your configured trigger...</div>
@@ -402,6 +402,7 @@
         let ws;
         let configData = null;
         let pendingCapture = null;
+        let originalName = null;
 
         // UI Elements
         const dot = document.getElementById('ws-dot');
@@ -697,6 +698,7 @@
             isEditing = false;
             isAddingTemplate = false;
             isCapturing = true;
+            document.getElementById('modal-title').innerText = 'Record Gesture';
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
@@ -714,6 +716,7 @@
             isEditing = false;
             isAddingTemplate = true;
             isCapturing = true;
+            document.getElementById('modal-title').innerText = 'Add Template';
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
@@ -735,6 +738,8 @@
             isEditing = true;
             isAddingTemplate = false;
             isCapturing = false;  // edit mode never starts a capture
+            originalName = name;
+            document.getElementById('modal-title').innerText = 'Edit Gesture';
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'none';
             document.getElementById('gesture-details').style.display = 'block';
@@ -748,7 +753,6 @@
             document.querySelector('.canvas-container').style.display = 'none';
 
             document.getElementById('new-gest-name').value = name;
-            document.getElementById('new-gest-name').disabled = true;
             document.getElementById('new-gest-action').value = actionStr;
             document.getElementById('new-gest-threshold').value = threshold || '';
         }
@@ -756,7 +760,6 @@
         function closeModal() {
             document.getElementById('record-modal').classList.remove('active');
             document.querySelector('.canvas-container').style.display = 'block';
-            document.getElementById('new-gest-name').disabled = false;
             // Only send cancel_capture if we were actually waiting for one.
             // Sending it from edit mode (or when already idle) creates a stale
             // capture_cancelled echo that closes the next modal open immediately.
@@ -765,6 +768,7 @@
             }
             isCapturing = false;
             pendingCapture = null;
+            originalName = null;
         }
 
         function handleCaptureResult(msg) {
@@ -878,7 +882,8 @@
             if (isEditing) {
                 ws.send(JSON.stringify({
                     type: 'update_gesture',
-                    name: name,
+                    old_name: originalName,
+                    new_name: name,
                     action: action,
                     confidence_threshold: threshold
                 }));
