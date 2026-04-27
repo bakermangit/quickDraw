@@ -26,13 +26,16 @@ This task involved a major overhaul of the QuickDraw web configuration interface
 - **Gesture List**:
     - Removed aggregate statistics from the main gesture header.
     - Added badges that dynamically show which filters (Speed/Length) are currently active for a gesture.
-- **Restart Daemon**:
-    - Replaced the "Reload from disk" button with a red "Restart Daemon" button.
+- **Gesture Templates Persistence**:
+    - Implemented state tracking for the template preview lists. The "Templates" section for a gesture now remains open even after adding a new template or updating the list.
+- **Recording Reset**:
+    - Added a "Reset" button to the capture modal, allowing users to discard a recording and immediately try again.
 
 ### 2. Backend (src/server/handlers.rs & src/config.rs)
-- **Restart Daemon Command**:
+- **Restart Daemon Command (Experimental/Hidden)**:
     - Added `RestartDaemon` to the `ClientMessage` enum.
     - Implemented logic to spawn a fresh instance of the current executable and exit the current process using `std::env::current_exe()` and `std::process::Command`.
+    - *Note: This feature is currently hidden from the UI as it experienced stability issues (crashing on subsequent restarts). The backend command remains for testing.*
 - **New Gesture Config Fields**:
     - Added `volume: Option<f64>` to `GestureConfig` in `src/config.rs`.
     - Updated `UpdateGesture` message to support syncing `sound` and `volume` across all templates of a gesture.

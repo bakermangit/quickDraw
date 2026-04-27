@@ -356,7 +356,6 @@
         <div id="gestures-tab" class="tab-content active">
             <div class="controls">
                 <button onclick="startRecording()">Record New Gesture</button>
-                <button class="danger" onclick="restartDaemon()">Restart Daemon</button>
             </div>
             
             <div id="gesture-list">
@@ -530,6 +529,7 @@
             </div>
 
             <div class="modal-actions">
+                <button id="reset-capture-btn" class="secondary" onclick="resetCapture()" style="display: none;">Reset</button>
                 <button class="secondary" onclick="closeModal()">Cancel</button>
                 <button id="save-gest-btn" onclick="saveNewGesture()" disabled>Save Gesture</button>
             </div>
@@ -542,6 +542,7 @@
         let pendingCapture = null;
         let originalName = null;
         let allGestures = [];
+        let expandedGestures = new Set();
 
         // UI Elements
         const dot = document.getElementById('ws-dot');
@@ -552,7 +553,7 @@
             const type = document.getElementById('trigger-type').value;
             const btn2Group = document.getElementById('trigger-btn2-group');
             if (type === 'combo') {
-                btn2Group.style.display = 'block';
+                btn2Group.style.display = 'flex';
             } else {
                 btn2Group.style.display = 'none';
             }
@@ -815,6 +816,7 @@
                     `;
                 });
 
+                const isExpanded = expandedGestures.has(g.name);
                 div.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div class="gesture-info">
@@ -829,7 +831,7 @@
                             <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
                         </div>
                     </div>
-                    <div id="templates-container-${g.name}" style="display: none; margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                    <div id="templates-container-${g.name}" style="display: ${isExpanded ? 'block' : 'none'}; margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 10px;">
                         ${templatesHtml}
                     </div>
                 `;
@@ -846,8 +848,10 @@
             const container = document.getElementById(`templates-container-${name}`);
             if (container.style.display === 'none') {
                 container.style.display = 'block';
+                expandedGestures.add(name);
             } else {
                 container.style.display = 'none';
+                expandedGestures.delete(name);
             }
         }
 
@@ -926,6 +930,7 @@
             document.getElementById('gesture-props').style.display = 'block';
             document.getElementById('speed-stats-ref').style.display = 'none';
             document.getElementById('len-stats-ref').style.display = 'none';
+            document.getElementById('reset-capture-btn').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = true;
             document.getElementById('save-gest-btn').innerText = 'Save Gesture';
 
@@ -962,6 +967,7 @@
             document.getElementById('gesture-details').style.display = 'none';
             document.getElementById('gesture-props').style.display = 'none';
             document.querySelectorAll('#record-modal .persistent-box').forEach(box => box.style.display = 'none');
+            document.getElementById('reset-capture-btn').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = true;
             document.getElementById('save-gest-btn').innerText = 'Add Template';
 
@@ -985,6 +991,7 @@
             document.getElementById('waiting-msg').style.display = 'none';
             document.getElementById('gesture-details').style.display = 'block';
             document.getElementById('gesture-props').style.display = 'block';
+            document.getElementById('reset-capture-btn').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = false;
             document.getElementById('save-gest-btn').innerText = 'Update Gesture';
 
@@ -1014,11 +1021,11 @@
 
             const speedStats = document.getElementById('speed-stats-ref');
             speedStats.style.display = 'block';
-            speedStats.innerHTML = `Ref (n=${gestures.length}): ${minSpeed} - ${maxSpeed} (avg: ${avgSpeed})`;
+            speedStats.innerHTML = `Templates = ${gestures.length}; Min = ${minSpeed}, Max = ${maxSpeed}, Avg = ${avgSpeed}`;
 
             const lenStats = document.getElementById('len-stats-ref');
             lenStats.style.display = 'block';
-            lenStats.innerHTML = `Ref (n=${gestures.length}): ${minLen} - ${maxLen} (avg: ${avgLen})`;
+            lenStats.innerHTML = `Templates = ${gestures.length}; Min = ${minLen}, Max = ${maxLen}, Avg = ${avgLen}`;
 
             document.getElementById('new-gest-name').value = g.name;
             document.getElementById('new-gest-action').value = formatAction(g.action);
@@ -1039,6 +1046,21 @@
 
             toggleFilterInputs();
             toggleThresholdInput();
+        }
+
+        function resetCapture() {
+            const canvas = document.getElementById('gesture-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            document.getElementById('waiting-msg').style.display = 'block';
+            document.getElementById('gesture-details').style.display = 'none';
+            document.getElementById('reset-capture-btn').style.display = 'none';
+            document.getElementById('save-gest-btn').disabled = true;
+
+            isCapturing = true;
+            pendingCapture = null;
+            ws.send(JSON.stringify({ type: 'start_capture' }));
         }
 
         function closeModal() {
@@ -1062,6 +1084,7 @@
 
             document.getElementById('waiting-msg').style.display = 'none';
             document.getElementById('gesture-details').style.display = 'block';
+            document.getElementById('reset-capture-btn').style.display = 'inline-block';
             document.getElementById('save-gest-btn').disabled = false;
             
             if (!isAddingTemplate) {
