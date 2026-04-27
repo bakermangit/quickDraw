@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use std::mem::size_of;
+#[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
     KEYEVENTF_KEYUP, VIRTUAL_KEY,
@@ -83,6 +84,7 @@ fn is_extended_key(vk: u16) -> bool {
     )
 }
 
+#[cfg(windows)]
 fn make_key_input(vk: u16, keyup: bool) -> INPUT {
     let mut flags = windows::Win32::UI::Input::KeyboardAndMouse::KEYBD_EVENT_FLAGS(0);
     if keyup {
@@ -108,26 +110,29 @@ fn make_key_input(vk: u16, keyup: bool) -> INPUT {
 
 impl OutputAction for KeyPressAction {
     fn execute(&self) -> Result<()> {
-        let mut inputs: Vec<INPUT> = Vec::new();
+        #[cfg(windows)]
+        {
+            let mut inputs: Vec<INPUT> = Vec::new();
 
-        // Press modifiers
-        for &modifier in &self.modifiers {
-            inputs.push(make_key_input(modifier, false)); // keydown
-        }
+            // Press modifiers
+            for &modifier in &self.modifiers {
+                inputs.push(make_key_input(modifier, false)); // keydown
+            }
 
-        // Press and release main key
-        inputs.push(make_key_input(self.key, false)); // keydown
-        inputs.push(make_key_input(self.key, true));  // keyup
+            // Press and release main key
+            inputs.push(make_key_input(self.key, false)); // keydown
+            inputs.push(make_key_input(self.key, true));  // keyup
 
-        // Release modifiers (reverse order)
-        for &modifier in self.modifiers.iter().rev() {
-            inputs.push(make_key_input(modifier, true)); // keyup
-        }
+            // Release modifiers (reverse order)
+            for &modifier in self.modifiers.iter().rev() {
+                inputs.push(make_key_input(modifier, true)); // keyup
+            }
 
-        // Send all at once
-        let sent = unsafe { SendInput(&inputs, size_of::<INPUT>() as i32) };
-        if sent != inputs.len() as u32 {
-            return Err(anyhow!("SendInput only sent {}/{} events", sent, inputs.len()));
+            // Send all at once
+            let sent = unsafe { SendInput(&inputs, size_of::<INPUT>() as i32) };
+            if sent != inputs.len() as u32 {
+                return Err(anyhow!("SendInput only sent {}/{} events", sent, inputs.len()));
+            }
         }
         Ok(())
     }
@@ -156,6 +161,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
     fn test_make_key_input() {
         let input = make_key_input(0x41, false);
         assert_eq!(input.r#type, INPUT_KEYBOARD);

@@ -3,6 +3,7 @@ use std::time::Instant;
 use anyhow::{anyhow, Result};
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+#[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
 
 use crate::config::{Config, TriggerConfig, GestureConfig};
@@ -80,11 +81,14 @@ impl TriggerDetector {
     }
 
     fn get_cursor_pos() -> (f64, f64) {
+        #[cfg(windows)]
         unsafe {
             let mut pos = windows::Win32::Foundation::POINT::default();
             let _ = windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut pos);
             (pos.x as f64, pos.y as f64)
         }
+        #[cfg(not(windows))]
+        (0.0, 0.0)
     }
 
     pub fn process(&mut self, event: &InputEvent) -> TriggerSignal {
@@ -235,7 +239,8 @@ fn compute_speed(capture: &GestureCapture) -> f64 {
 }
 
 pub struct Pipeline {
-    input_source: Box<dyn InputSource>,
+    mouse_input_source: Box<dyn InputSource>,
+    keyboard_input_source: Box<dyn InputSource>,
     recognizer: Box<dyn GestureRecognizer>,
     templates: Vec<GestureTemplate>,
     actions: HashMap<String, Box<dyn OutputAction>>,
@@ -248,10 +253,16 @@ pub struct Pipeline {
 }
 
 pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<CaptureRequest>) -> Result<Pipeline> {
-    let input_source: Box<dyn InputSource> = match config.general.input_method.as_str() {
-        "raw_input" => Box::new(RawInputSource::new()),
+    let mouse_input_source: Box<dyn InputSource> = match config.general.mouse_input_method.as_str() {
+        "raw_input" => Box::new(RawInputSource::new(true, false)),
         "hook" => Box::new(HookInputSource::new()),
-        other => return Err(anyhow!("Unknown input method: {}", other)),
+        other => return Err(anyhow!("Unknown mouse input method: {}", other)),
+    };
+
+    let keyboard_input_source: Box<dyn InputSource> = match config.general.keyboard_input_method.as_str() {
+        "raw_input" => Box::new(RawInputSource::new(false, true)),
+        "hook" => Box::new(HookInputSource::new()),
+        other => return Err(anyhow!("Unknown keyboard input method: {}", other)),
     };
 
     let recognizer: Box<dyn GestureRecognizer> = match config.general.recognizer.as_str() {
@@ -292,7 +303,8 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
     };
 
     Ok(Pipeline {
-        input_source,
+        mouse_input_source,
+        keyboard_input_source,
         recognizer,
         templates,
         actions,
@@ -308,7 +320,8 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
 impl Pipeline {
     pub async fn run(mut self) -> Result<()> {
         let (tx, mut rx) = mpsc::channel(256);
-        self.input_source.start(tx)?;
+        self.mouse_input_source.start(tx.clone())?;
+        self.keyboard_input_source.start(tx)?;
 
         let mut accumulator = GestureAccumulator::new();
         let mut active_capture_request: Option<(oneshot::Sender<CaptureResult>, oneshot::Receiver<()>)> = None;
@@ -429,6 +442,7 @@ impl Pipeline {
                             }
 
                             if self.config.general.cursor_reset {
+                                #[cfg(windows)]
                                 unsafe {
                                     let _ = SetCursorPos(origin_pos.0 as i32, origin_pos.1 as i32);
                                 }
@@ -446,7 +460,8 @@ impl Pipeline {
 
     pub async fn capture_one(mut self, name: String, action_str: String) -> Result<()> {
         let (tx, mut rx) = mpsc::channel(256);
-        self.input_source.start(tx)?;
+        self.mouse_input_source.start(tx.clone())?;
+        self.keyboard_input_source.start(tx)?;
 
         println!("Hold your trigger key(s) and draw your gesture, then release...");
 
@@ -518,7 +533,8 @@ impl Pipeline {
             }
         }
         
-        let _ = self.input_source.stop();
+        let _ = self.mouse_input_source.stop();
+        let _ = self.keyboard_input_source.stop();
 
         Ok(())
     }

@@ -1,7 +1,5 @@
 use std::sync::mpsc;
 use std::thread;
-use crate::config::GeneralConfig;
-
 #[cfg(windows)]
 use windows::{
     core::*,
@@ -45,8 +43,10 @@ fn parse_hex_color(hex: &str) -> u32 {
 impl TraceOverlay {
     pub fn new(config: GeneralConfig) -> Self {
         let (command_tx, command_rx) = mpsc::channel();
+        #[cfg(windows)]
         let (hwnd_tx, hwnd_rx) = mpsc::channel();
 
+        #[cfg(windows)]
         thread::spawn(move || {
             #[cfg(windows)]
             unsafe {
@@ -216,7 +216,14 @@ impl TraceOverlay {
             }
         });
 
+        #[cfg(not(windows))]
+        let _ = (color_hex, command_rx);
+
+        #[cfg(windows)]
         let hwnd = hwnd_rx.recv().unwrap_or(0);
+        #[cfg(not(windows))]
+        let hwnd = 0;
+
         Self { command_tx, hwnd }
     }
 
