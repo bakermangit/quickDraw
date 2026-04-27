@@ -36,6 +36,7 @@ impl Default for Config {
             },
             audio: AudioConfig {
                 enabled: true,
+                volume: 1.0,
                 success: "sounds/success.wav".to_string(),
                 error: "sounds/error.wav".to_string(),
             },
@@ -85,6 +86,7 @@ pub enum TriggerConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioConfig {
     pub enabled: bool,
+    pub volume: f64,
     pub success: String,
     pub error: String,
 }
@@ -109,7 +111,6 @@ pub struct GestureConfig {
     pub name: String,
     pub action: ActionConfig,
     pub sound: Option<String>,
-    pub volume: Option<f64>,
     pub pattern: GesturePatternConfig,
     pub raw: GestureCapture,
     pub confidence_threshold: Option<f64>,

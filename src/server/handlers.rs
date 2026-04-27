@@ -19,7 +19,6 @@ enum ClientMessage {
         new_name: String,
         action: crate::config::ActionConfig,
         sound: Option<String>,
-        volume: Option<f64>,
         confidence_threshold: Option<f64>,
         min_speed_px_per_ms: Option<f64>,
         max_speed_px_per_ms: Option<f64>,
@@ -32,7 +31,6 @@ enum ClientMessage {
     StartCapture,
     CancelCapture,
     Reload,
-    RestartDaemon,
 }
 
 #[derive(Serialize)]
@@ -110,7 +108,6 @@ pub async fn handle_socket(
                             new_name,
                             action,
                             sound,
-                            volume,
                             confidence_threshold,
                             min_speed_px_per_ms,
                             max_speed_px_per_ms,
@@ -125,7 +122,6 @@ pub async fn handle_socket(
                                     g.name = new_name.clone();
                                     g.action = action.clone();
                                     g.sound = sound.clone();
-                                    g.volume = volume;
                                     g.confidence_threshold = confidence_threshold;
                                     g.min_speed_px_per_ms = min_speed_px_per_ms;
                                     g.max_speed_px_per_ms = max_speed_px_per_ms;
@@ -238,22 +234,6 @@ pub async fn handle_socket(
                                 Err(e) => {
                                     let _ = tx.send(ServerMessage::Error { message: e.to_string() }).await;
                                 }
-                            }
-                        }
-                        ClientMessage::RestartDaemon => {
-                            if let Ok(exe_path) = std::env::current_exe() {
-                                #[cfg(windows)]
-                                {
-                                    // Use 'start' via cmd to detach the new process on Windows
-                                    let _ = std::process::Command::new("cmd")
-                                        .args(["/C", "start", "", &exe_path.to_string_lossy()])
-                                        .spawn();
-                                }
-                                #[cfg(not(windows))]
-                                {
-                                    let _ = std::process::Command::new(exe_path).spawn();
-                                }
-                                std::process::exit(0);
                             }
                         }
                     }

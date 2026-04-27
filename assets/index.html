@@ -398,9 +398,17 @@
                 <label for="cursor-reset">Cursor Reset</label>
             </div>
 
-            <div class="form-group checkbox-group">
-                <input type="checkbox" id="audio-enabled">
-                <label for="audio-enabled">Audio Enabled</label>
+            <div class="persistent-box">
+                <h3>
+                    <input type="checkbox" id="audio-enabled" onchange="toggleAudioInputs()">
+                    Audio Feedback
+                </h3>
+                <div id="audio-settings-inputs">
+                    <div class="form-group">
+                        <label for="audio-volume">Volume (0-100)</label>
+                        <input type="number" id="audio-volume" min="0" max="100" value="100">
+                    </div>
+                </div>
             </div>
 
             <div class="persistent-box">
@@ -441,7 +449,7 @@
                     <input type="text" id="trigger-btn1" value="Mouse1">
                 </div>
 
-                <div class="form-group" id="trigger-btn2-group">
+                <div class="form-group" id="trigger-btn2-group" style="display: flex;">
                     <label for="trigger-btn2">Second Button (for Combo)</label>
                     <input type="text" id="trigger-btn2" value="Mouse2">
                 </div>
@@ -483,11 +491,6 @@
                     <div class="form-group">
                         <label for="new-gest-sound">Sound Path</label>
                         <input type="text" id="new-gest-sound" placeholder="sounds/success.wav">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="new-gest-volume">Volume (0-100)</label>
-                        <input type="number" id="new-gest-volume" min="0" max="100" value="100">
                     </div>
                 </div>
 
@@ -589,6 +592,11 @@
             document.getElementById('new-gest-threshold').disabled = !enabled;
         }
 
+        function toggleAudioInputs() {
+            const enabled = document.getElementById('audio-enabled').checked;
+            document.querySelectorAll('#audio-settings-inputs input').forEach(i => i.disabled = !enabled);
+        }
+
         function toggleTraceFinesseInputs() {
             const finesseEnabled = document.getElementById('trace-finesse-enabled').checked;
             const inputs = document.querySelectorAll('#trace-finesse-inputs input');
@@ -670,6 +678,8 @@
             
             document.getElementById('cursor-reset').checked = configData.general.cursor_reset;
             document.getElementById('audio-enabled').checked = configData.audio.enabled;
+            document.getElementById('audio-volume').value = Math.round(configData.audio.volume * 100);
+            toggleAudioInputs();
 
             document.getElementById('trace-finesse-enabled').checked = configData.general.trace_finesse_enabled;
             document.getElementById('trace-min-stroke').value = configData.general.trace_min_stroke;
@@ -699,6 +709,7 @@
             configData.general.confidence_threshold = parseFloat(document.getElementById('confidence').value);
             configData.general.cursor_reset = document.getElementById('cursor-reset').checked;
             configData.audio.enabled = document.getElementById('audio-enabled').checked;
+            configData.audio.volume = parseFloat(document.getElementById('audio-volume').value) / 100.0;
 
             configData.general.trace_finesse_enabled = document.getElementById('trace-finesse-enabled').checked;
             configData.general.trace_min_stroke = parseInt(document.getElementById('trace-min-stroke').value);
@@ -908,11 +919,6 @@
             ws.send(JSON.stringify({ type: 'reload' }));
         }
 
-        function restartDaemon() {
-            if (confirm("Restart the QuickDraw daemon? This will disconnect the current session.")) {
-                ws.send(JSON.stringify({ type: 'restart_daemon' }));
-            }
-        }
 
         // Modal and Recording Logic
         let isEditing = false;
@@ -943,7 +949,6 @@
             document.getElementById('override-threshold').checked = false;
             document.getElementById('new-gest-threshold').value = '';
             document.getElementById('new-gest-sound').value = '';
-            document.getElementById('new-gest-volume').value = 100;
             document.getElementById('enable-speed-filter').checked = false;
             document.getElementById('new-gest-min-speed').value = '';
             document.getElementById('new-gest-max-speed').value = '';
@@ -1034,7 +1039,6 @@
             document.getElementById('new-gest-threshold').value = g.confidence_threshold || '';
 
             document.getElementById('new-gest-sound').value = g.sound || '';
-            document.getElementById('new-gest-volume').value = Math.round((g.volume || 1.0) * 100);
 
             document.getElementById('enable-speed-filter').checked = (g.min_speed_px_per_ms !== null || g.max_speed_px_per_ms !== null);
             document.getElementById('new-gest-min-speed').value = g.min_speed_px_per_ms || '';
@@ -1205,7 +1209,6 @@
             }
 
             const sound = document.getElementById('new-gest-sound').value.trim() || null;
-            const volume = parseFloat(document.getElementById('new-gest-volume').value) / 100.0;
 
             const speedEnabled = document.getElementById('enable-speed-filter').checked;
             const min_speed = speedEnabled ? parseFloat(document.getElementById('new-gest-min-speed').value) || null : null;
@@ -1222,7 +1225,6 @@
                     new_name: name,
                     action: action,
                     sound: sound,
-                    volume: volume,
                     confidence_threshold: threshold,
                     min_speed_px_per_ms: min_speed,
                     max_speed_px_per_ms: max_speed,
@@ -1234,7 +1236,6 @@
 
                 // If adding template, inherit from existing gesture properties
                 let finalSound = sound;
-                let finalVolume = volume;
                 let finalThreshold = threshold;
                 let finalMinSpeed = min_speed;
                 let finalMaxSpeed = max_speed;
@@ -1245,7 +1246,6 @@
                     const existing = allGestures.filter(g => g.name === name).pop();
                     if (existing) {
                         finalSound = existing.sound;
-                        finalVolume = existing.volume;
                         finalThreshold = existing.confidence_threshold;
                         finalMinSpeed = existing.min_speed_px_per_ms;
                         finalMaxSpeed = existing.max_speed_px_per_ms;
@@ -1258,7 +1258,6 @@
                     name: name,
                     action: action,
                     sound: finalSound,
-                    volume: finalVolume,
                     pattern: {
                         algorithm: pendingCapture.processed.algorithm,
                         template_points: pendingCapture.processed.template_points

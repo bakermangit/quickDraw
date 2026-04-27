@@ -48,33 +48,19 @@ impl AudioPlayer {
             return;
         }
 
-        let extension = absolute_path.extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-
-        if extension == "wav" {
-            #[cfg(windows)]
-            {
-                let wide = HSTRING::from(absolute_path.as_os_str());
-                unsafe {
-                    let _ = PlaySoundW(&wide, None, SND_FILENAME | SND_ASYNC);
-                }
-            }
-        } else {
-            // Use MCI for MP3 and other formats
-            self.play_mci(&absolute_path);
-        }
+        // Use MCI for all playback to support volume control consistently
+        self.play_mci(&absolute_path);
     }
 
     fn play_mci(&self, _path: &std::path::Path) {
         #[cfg(windows)]
         {
             let path_str = _path.to_string_lossy();
-            // MCI commands need to handle spaces in paths. Quoting the path is the standard way.
-            // We use aliases to manage the sound.
-            // For simple fire-and-forget, we close the alias before opening it again.
+            // MCI volume is 0-1000
+            let volume = (self.config.volume * 1000.0).clamp(0.0, 1000.0) as u32;
+
             let open_cmd = HSTRING::from(format!("open \"{}\" alias qdsound", path_str));
+            let volume_cmd = HSTRING::from(format!("setaudio qdsound volume to {}", volume));
             let play_cmd = HSTRING::from("play qdsound from 0");
             let close_cmd = HSTRING::from("close qdsound");
 
@@ -82,6 +68,7 @@ impl AudioPlayer {
                 // Close any previous instance first
                 let _ = mciSendStringW(&close_cmd, None, None);
                 if mciSendStringW(&open_cmd, None, None) == 0 {
+                    let _ = mciSendStringW(&volume_cmd, None, None);
                     let _ = mciSendStringW(&play_cmd, None, None);
                 } else {
                     tracing::error!("MCI failed to open audio file: {}", path_str);
