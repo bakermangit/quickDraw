@@ -1,6 +1,9 @@
 use std::path::PathBuf;
+#[cfg(windows)]
 use windows::Win32::Media::Audio::{PlaySoundW, SND_FILENAME, SND_ASYNC};
+#[cfg(windows)]
 use windows::Win32::Media::Multimedia::mciSendStringW;
+#[cfg(windows)]
 use windows::core::HSTRING;
 use crate::config::{AudioConfig, get_config_dir};
 
@@ -51,9 +54,12 @@ impl AudioPlayer {
             .to_lowercase();
 
         if extension == "wav" {
-            let wide = HSTRING::from(absolute_path.as_os_str());
-            unsafe {
-                let _ = PlaySoundW(&wide, None, SND_FILENAME | SND_ASYNC);
+            #[cfg(windows)]
+            {
+                let wide = HSTRING::from(absolute_path.as_os_str());
+                unsafe {
+                    let _ = PlaySoundW(&wide, None, SND_FILENAME | SND_ASYNC);
+                }
             }
         } else {
             // Use MCI for MP3 and other formats
@@ -61,22 +67,25 @@ impl AudioPlayer {
         }
     }
 
-    fn play_mci(&self, path: &std::path::Path) {
-        let path_str = path.to_string_lossy();
-        // MCI commands need to handle spaces in paths. Quoting the path is the standard way.
-        // We use aliases to manage the sound. 
-        // For simple fire-and-forget, we close the alias before opening it again.
-        let open_cmd = HSTRING::from(format!("open \"{}\" alias qdsound", path_str));
-        let play_cmd = HSTRING::from("play qdsound from 0");
-        let close_cmd = HSTRING::from("close qdsound");
+    fn play_mci(&self, _path: &std::path::Path) {
+        #[cfg(windows)]
+        {
+            let path_str = _path.to_string_lossy();
+            // MCI commands need to handle spaces in paths. Quoting the path is the standard way.
+            // We use aliases to manage the sound.
+            // For simple fire-and-forget, we close the alias before opening it again.
+            let open_cmd = HSTRING::from(format!("open \"{}\" alias qdsound", path_str));
+            let play_cmd = HSTRING::from("play qdsound from 0");
+            let close_cmd = HSTRING::from("close qdsound");
 
-        unsafe {
-            // Close any previous instance first
-            let _ = mciSendStringW(&close_cmd, None, None);
-            if mciSendStringW(&open_cmd, None, None) == 0 {
-                let _ = mciSendStringW(&play_cmd, None, None);
-            } else {
-                tracing::error!("MCI failed to open audio file: {}", path_str);
+            unsafe {
+                // Close any previous instance first
+                let _ = mciSendStringW(&close_cmd, None, None);
+                if mciSendStringW(&open_cmd, None, None) == 0 {
+                    let _ = mciSendStringW(&play_cmd, None, None);
+                } else {
+                    tracing::error!("MCI failed to open audio file: {}", path_str);
+                }
             }
         }
     }

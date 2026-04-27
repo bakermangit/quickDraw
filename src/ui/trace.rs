@@ -1,5 +1,6 @@
 use std::sync::mpsc;
 use std::thread;
+#[cfg(windows)]
 use windows::{
     core::*,
     Win32::Foundation::*,
@@ -41,8 +42,10 @@ fn parse_hex_color(hex: &str) -> u32 {
 impl TraceOverlay {
     pub fn new(color_hex: String) -> Self {
         let (command_tx, command_rx) = mpsc::channel();
+        #[cfg(windows)]
         let (hwnd_tx, hwnd_rx) = mpsc::channel();
 
+        #[cfg(windows)]
         thread::spawn(move || {
             unsafe {
                 let h_instance = GetModuleHandleW(None).unwrap_or_default();
@@ -182,12 +185,20 @@ impl TraceOverlay {
             }
         });
 
-        let hwnd = hwnd_rx.recv().unwrap();
+        #[cfg(not(windows))]
+        let _ = (color_hex, command_rx);
+
+        #[cfg(windows)]
+        let hwnd = hwnd_rx.recv().unwrap_or(0);
+        #[cfg(not(windows))]
+        let hwnd = 0;
+
         Self { command_tx, hwnd }
     }
 
     pub fn send(&self, command: TraceCommand) {
         if self.command_tx.send(command).is_ok() {
+            #[cfg(windows)]
             unsafe {
                 let _ = PostMessageW(HWND(self.hwnd as *mut _), WM_USER_WAKE, WPARAM(0), LPARAM(0));
             }
@@ -195,8 +206,10 @@ impl TraceOverlay {
     }
 }
 
+#[cfg(windows)]
 const WM_USER_WAKE: u32 = WM_USER + 1;
 
+#[cfg(windows)]
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_DESTROY => {
