@@ -312,11 +312,18 @@
 
         <div id="settings-tab" class="tab-content">
             <div class="form-group">
-                <label for="input-method">Input Method</label>
-                <select id="input-method">
+                <label for="mouse-input-method">Mouse Input Method</label>
+                <select id="mouse-input-method">
                     <option value="raw_input">Raw Input</option>
                     <option value="hook">Hook</option>
-                    <option value="polling">Polling</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="keyboard-input-method">Keyboard Input Method</label>
+                <select id="keyboard-input-method">
+                    <option value="raw_input">Raw Input</option>
+                    <option value="hook">Hook</option>
                 </select>
             </div>
 
@@ -491,7 +498,8 @@
         function populateSettings() {
             if (!configData) return;
             
-            document.getElementById('input-method').value = configData.general.input_method;
+            document.getElementById('mouse-input-method').value = configData.general.mouse_input_method;
+            document.getElementById('keyboard-input-method').value = configData.general.keyboard_input_method;
             document.getElementById('recognizer').value = configData.general.recognizer;
             
             confRange.value = configData.general.confidence_threshold;
@@ -515,7 +523,8 @@
         function saveConfig() {
             if (!configData) return;
 
-            configData.general.input_method = document.getElementById('input-method').value;
+            configData.general.mouse_input_method = document.getElementById('mouse-input-method').value;
+            configData.general.keyboard_input_method = document.getElementById('keyboard-input-method').value;
             configData.general.recognizer = document.getElementById('recognizer').value;
             configData.general.confidence_threshold = parseFloat(document.getElementById('confidence').value);
             configData.general.cursor_reset = document.getElementById('cursor-reset').checked;

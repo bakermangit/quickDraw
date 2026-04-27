@@ -17,7 +17,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             general: GeneralConfig {
-                input_method: "raw_input".to_string(),
+                mouse_input_method: "raw_input".to_string(),
+                keyboard_input_method: "raw_input".to_string(),
                 recognizer: "dollar_one".to_string(),
                 confidence_threshold: 0.80,
                 gesture_profile: "default".to_string(),
@@ -46,7 +47,8 @@ impl Default for Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeneralConfig {
-    pub input_method: String,
+    pub mouse_input_method: String,
+    pub keyboard_input_method: String,
     pub recognizer: String,
     pub confidence_threshold: f64,
     pub gesture_profile: String,
