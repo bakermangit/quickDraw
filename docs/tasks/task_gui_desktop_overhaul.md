@@ -45,7 +45,7 @@ This task involved a major overhaul of the QuickDraw web configuration interface
 ### Audio Volume Control (MCI)
 To support volume adjustment, the application now utilizes MCI aliases (`qdsound`) for all fire-and-forget audio playback. The `setaudio qdsound volume to <0-1000>` command is used to apply the global configuration setting before each `play` command.
 
-For `.wav` files, the MCI `open` command explicitly uses `type waveaudio` to ensure the correct system driver is used, as the default MCI mapping sometimes fails to support volume commands for WAV formats. Standard `PlaySoundW` was bypassed entirely to maintain consistent volume control.
+For robust volume support, the application now attempts to open all audio files (including `.wav`) using `type mpegvideo` (DirectShow). If this fails, it falls back to a standard auto-type open. Multiple volume command variants (`setaudio volume` and `set audio volume`) are issued to maximize driver compatibility. Standard `PlaySoundW` was bypassed entirely to maintain consistent volume control.
 
 ### JSON Payload Updates
 - **`AudioConfig`**: Now includes a `volume` field (float, 0.0 to 1.0).
