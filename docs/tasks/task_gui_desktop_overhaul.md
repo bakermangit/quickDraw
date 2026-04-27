@@ -46,11 +46,16 @@ This task involved a major overhaul of the QuickDraw web configuration interface
 ## Architectural Notes for AI Architect
 
 ### Audio Volume Control (MCI)
-To support volume adjustment, the application now utilizes MCI aliases (`qdsound`) for all fire-and-forget audio playback. The `setaudio qdsound volume to <0-1000>` command is used to apply the global configuration setting before each `play` command. Standard `PlaySoundW` (WAV only) was bypassed as it does not natively support per-process volume levels.
+To support volume adjustment, the application now utilizes MCI aliases (`qdsound`) for all fire-and-forget audio playback. The `setaudio qdsound volume to <0-1000>` command is used to apply the global configuration setting before each `play` command.
+
+For `.wav` files, the MCI `open` command explicitly uses `type waveaudio` to ensure the correct system driver is used, as the default MCI mapping sometimes fails to support volume commands for WAV formats. Standard `PlaySoundW` was bypassed entirely to maintain consistent volume control.
 
 ### JSON Payload Updates
 - **`AudioConfig`**: Now includes a `volume` field (float, 0.0 to 1.0).
 - **`UpdateGesture`**: No longer includes `volume`.
 
-### Threshold Logic
-The UI now distinguishes between "inherited" and "overridden" thresholds. If "Override Global Threshold" is unchecked, the UI sends `null` for `confidence_threshold`, signaling the pipeline to use the value from `GeneralConfig`.
+### Override Logic (Threshold & Sound)
+The UI now distinguishes between "inherited" and "overridden" properties for both Confidence Thresholds and Custom Sounds.
+- If "Override Global Threshold" is unchecked, `confidence_threshold` is sent as `null`.
+- If "Custom Sound" is unchecked, `sound` is sent as `null`.
+The backend pipeline interprets `null` as a signal to use the global defaults defined in the `Config` struct.

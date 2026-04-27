@@ -489,8 +489,11 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="new-gest-sound">Sound Path</label>
-                        <input type="text" id="new-gest-sound" placeholder="sounds/success.wav">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="override-sound" onchange="toggleCustomSoundInput()">
+                            <label for="override-sound">Custom Sound</label>
+                        </div>
+                        <input type="text" id="new-gest-sound" placeholder="sounds/success.wav" disabled>
                     </div>
                 </div>
 
@@ -595,6 +598,11 @@
         function toggleAudioInputs() {
             const enabled = document.getElementById('audio-enabled').checked;
             document.querySelectorAll('#audio-settings-inputs input').forEach(i => i.disabled = !enabled);
+        }
+
+        function toggleCustomSoundInput() {
+            const enabled = document.getElementById('override-sound').checked;
+            document.getElementById('new-gest-sound').disabled = !enabled;
         }
 
         function toggleTraceFinesseInputs() {
@@ -948,6 +956,7 @@
             document.getElementById('new-gest-action').value = '';
             document.getElementById('override-threshold').checked = false;
             document.getElementById('new-gest-threshold').value = '';
+            document.getElementById('override-sound').checked = false;
             document.getElementById('new-gest-sound').value = '';
             document.getElementById('enable-speed-filter').checked = false;
             document.getElementById('new-gest-min-speed').value = '';
@@ -1038,6 +1047,7 @@
             document.getElementById('override-threshold').checked = g.confidence_threshold !== null;
             document.getElementById('new-gest-threshold').value = g.confidence_threshold || '';
 
+            document.getElementById('override-sound').checked = g.sound !== null;
             document.getElementById('new-gest-sound').value = g.sound || '';
 
             document.getElementById('enable-speed-filter').checked = (g.min_speed_px_per_ms !== null || g.max_speed_px_per_ms !== null);
@@ -1050,6 +1060,7 @@
 
             toggleFilterInputs();
             toggleThresholdInput();
+            toggleCustomSoundInput();
         }
 
         function resetCapture() {
@@ -1178,6 +1189,8 @@
 
             const overrideThreshold = document.getElementById('override-threshold').checked;
             const thresholdStr = document.getElementById('new-gest-threshold').value.trim();
+            const overrideSound = document.getElementById('override-sound').checked;
+            const soundStr = document.getElementById('new-gest-sound').value.trim();
 
             if (!name || (!isAddingTemplate && !actionStr)) {
                 alert("Name and Action are required.");
@@ -1208,7 +1221,7 @@
                 }
             }
 
-            const sound = document.getElementById('new-gest-sound').value.trim() || null;
+            const sound = overrideSound ? soundStr || null : null;
 
             const speedEnabled = document.getElementById('enable-speed-filter').checked;
             const min_speed = speedEnabled ? parseFloat(document.getElementById('new-gest-min-speed').value) || null : null;
