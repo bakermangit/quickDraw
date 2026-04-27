@@ -27,3 +27,7 @@ Enable editing of the gesture name field in the configuration UI and provide cle
 - UI correctly displays "Edit Gesture" title.
 - Gesture name field is now editable in the modal.
 - Renaming a gesture successfully updates the `gestures.toml` file with the new name across all associated templates.
+
+## Addendum — Architect Review (2026-04-26)
+
+All decisions accepted. The `old_name`/`new_name` approach is the correct way to handle renaming without relying on internal UUIDs or unique indices (which we avoid to keep the TOML config human-editable and readable). Dynamically updating the modal title is a clean UX improvement.
