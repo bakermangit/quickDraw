@@ -507,6 +507,7 @@ impl Pipeline {
                         name: name.clone(),
                         action,
                         sound: None,
+                        volume: None,
                         pattern,
                         raw: capture,
                         confidence_threshold: None,

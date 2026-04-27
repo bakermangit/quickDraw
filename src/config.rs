@@ -109,6 +109,7 @@ pub struct GestureConfig {
     pub name: String,
     pub action: ActionConfig,
     pub sound: Option<String>,
+    pub volume: Option<f64>,
     pub pattern: GesturePatternConfig,
     pub raw: GestureCapture,
     pub confidence_threshold: Option<f64>,

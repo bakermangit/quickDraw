@@ -18,6 +18,8 @@ enum ClientMessage {
         old_name: String,
         new_name: String,
         action: crate::config::ActionConfig,
+        sound: Option<String>,
+        volume: Option<f64>,
         confidence_threshold: Option<f64>,
         min_speed_px_per_ms: Option<f64>,
         max_speed_px_per_ms: Option<f64>,
@@ -30,6 +32,7 @@ enum ClientMessage {
     StartCapture,
     CancelCapture,
     Reload,
+    RestartDaemon,
 }
 
 #[derive(Serialize)]
@@ -106,6 +109,8 @@ pub async fn handle_socket(
                             old_name,
                             new_name,
                             action,
+                            sound,
+                            volume,
                             confidence_threshold,
                             min_speed_px_per_ms,
                             max_speed_px_per_ms,
@@ -119,6 +124,8 @@ pub async fn handle_socket(
                                 if g.name == old_name {
                                     g.name = new_name.clone();
                                     g.action = action.clone();
+                                    g.sound = sound.clone();
+                                    g.volume = volume;
                                     g.confidence_threshold = confidence_threshold;
                                     g.min_speed_px_per_ms = min_speed_px_per_ms;
                                     g.max_speed_px_per_ms = max_speed_px_per_ms;
@@ -231,6 +238,12 @@ pub async fn handle_socket(
                                 Err(e) => {
                                     let _ = tx.send(ServerMessage::Error { message: e.to_string() }).await;
                                 }
+                            }
+                        }
+                        ClientMessage::RestartDaemon => {
+                            if let Ok(exe_path) = std::env::current_exe() {
+                                let _ = std::process::Command::new(exe_path).spawn();
+                                std::process::exit(0);
                             }
                         }
                     }

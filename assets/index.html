@@ -180,24 +180,59 @@
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .form-group.vertical {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
         }
 
         label {
             display: block;
-            margin-bottom: 8px;
             color: var(--text-muted);
+            font-size: 14px;
+            flex: 1;
         }
 
         input[type="text"], input[type="number"], select {
-            width: 100%;
-            padding: 10px;
+            width: 200px;
+            padding: 8px 10px;
             background-color: var(--input-bg);
             border: 1px solid var(--border-color);
             color: var(--text-color);
             border-radius: 4px;
             box-sizing: border-box;
             font-family: var(--font-family);
+            font-size: 14px;
+        }
+
+        input:disabled, select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .persistent-box {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .persistent-box h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         input[type="range"] {
@@ -206,17 +241,20 @@
         }
 
         .checkbox-group {
-            display: flex;
+            display: flex !important;
             align-items: center;
             gap: 10px;
+            justify-content: flex-start !important;
         }
 
         .checkbox-group input {
-            width: auto;
+            width: auto !important;
+            margin: 0;
         }
 
         .checkbox-group label {
             margin-bottom: 0;
+            flex: none;
         }
 
         /* Modal */
@@ -318,7 +356,7 @@
         <div id="gestures-tab" class="tab-content active">
             <div class="controls">
                 <button onclick="startRecording()">Record New Gesture</button>
-                <button class="secondary" onclick="reloadGestures()">Reload from Disk</button>
+                <button class="danger" onclick="restartDaemon()">Restart Daemon</button>
             </div>
             
             <div id="gesture-list">
@@ -352,8 +390,8 @@
             </div>
 
             <div class="form-group">
-                <label for="confidence">Confidence Threshold (<span id="conf-val">0.80</span>)</label>
-                <input type="range" id="confidence" min="0.5" max="1.0" step="0.01" value="0.8">
+                <label for="confidence">Confidence Threshold</label>
+                <input type="number" id="confidence" min="0.5" max="1.0" step="0.01" value="0.8">
             </div>
 
             <div class="form-group checkbox-group">
@@ -366,46 +404,48 @@
                 <label for="audio-enabled">Audio Enabled</label>
             </div>
 
-            <h3>Trace Settings</h3>
-            <div class="form-group checkbox-group">
-                <input type="checkbox" id="trace-finesse-enabled" onchange="toggleTraceFinesseInputs()">
-                <label for="trace-finesse-enabled">Enable Trace Finesse (Dynamic Width)</label>
+            <div class="persistent-box">
+                <h3>
+                    <input type="checkbox" id="trace-finesse-enabled" onchange="toggleTraceFinesseInputs()">
+                    Trace Finesse (Dynamic Width)
+                </h3>
+                <div id="trace-finesse-inputs">
+                    <div class="form-group">
+                        <label for="trace-min-stroke">Min Stroke Width</label>
+                        <input type="number" id="trace-min-stroke" min="1" max="20" value="1">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="trace-max-stroke">Max Stroke Width</label>
+                        <input type="number" id="trace-max-stroke" min="1" max="50" value="10">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="trace-growth-rate">Growth Rate</label>
+                        <input type="number" id="trace-growth-rate" min="0.01" max="2.0" step="0.01" value="0.2">
+                    </div>
+                </div>
             </div>
 
-            <div id="trace-finesse-inputs" style="display: none;">
+            <div class="persistent-box">
+                <h3>Trigger</h3>
                 <div class="form-group">
-                    <label for="trace-min-stroke">Min Stroke Width (<span id="trace-min-val">1</span>)</label>
-                    <input type="range" id="trace-min-stroke" min="1" max="20" step="1" value="1" oninput="document.getElementById('trace-min-val').innerText = this.value">
+                    <label for="trigger-type">Trigger Type</label>
+                    <select id="trigger-type" onchange="updateTriggerUI()">
+                        <option value="combo">Button Combo</option>
+                        <option value="single">Single Button</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
-                    <label for="trace-max-stroke">Max Stroke Width (<span id="trace-max-val">10</span>)</label>
-                    <input type="range" id="trace-max-stroke" min="1" max="50" step="1" value="10" oninput="document.getElementById('trace-max-val').innerText = this.value">
+                    <label for="trigger-btn1">First Button / Key</label>
+                    <input type="text" id="trigger-btn1" value="Mouse1">
                 </div>
 
-                <div class="form-group">
-                    <label for="trace-growth-rate">Growth Rate (<span id="trace-growth-val">0.20</span>)</label>
-                    <input type="range" id="trace-growth-rate" min="0.01" max="2.0" step="0.01" value="0.2" oninput="document.getElementById('trace-growth-val').innerText = parseFloat(this.value).toFixed(2)">
+                <div class="form-group" id="trigger-btn2-group">
+                    <label for="trigger-btn2">Second Button (for Combo)</label>
+                    <input type="text" id="trigger-btn2" value="Mouse2">
                 </div>
-            </div>
-
-            <h3>Trigger</h3>
-            <div class="form-group">
-                <label for="trigger-type">Trigger Type</label>
-                <select id="trigger-type" onchange="updateTriggerUI()">
-                    <option value="combo">Button Combo</option>
-                    <option value="single">Single Button</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="trigger-btn1">First Button / Key</label>
-                <input type="text" id="trigger-btn1" value="Mouse1">
-            </div>
-
-            <div class="form-group" id="trigger-btn2-group">
-                <label for="trigger-btn2">Second Button (for Combo)</label>
-                <input type="text" id="trigger-btn2" value="Mouse2">
             </div>
 
             <button onclick="saveConfig()" style="margin-top: 20px;">Save Settings</button>
@@ -417,59 +457,76 @@
         <div class="modal">
             <h2 id="modal-title">Record Gesture</h2>
             
+            <!-- Reference Stats in Edit Mode -->
+            <div id="aggregate-stats" style="display: none; background: var(--input-bg); border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 12px; color: var(--text-muted);">
+                <!-- Populated via JS -->
+            </div>
+
             <div class="canvas-container">
                 <div id="waiting-msg" class="waiting-text">Draw your gesture with your configured trigger...</div>
                 <canvas id="gesture-canvas" width="250" height="250"></canvas>
             </div>
 
             <div id="gesture-details" style="display: none;">
-                <div class="form-group">
-                    <label for="new-gest-name">Name</label>
-                    <input type="text" id="new-gest-name" placeholder="e.g., flick-up">
-                </div>
-                <div class="form-group">
-                    <label for="new-gest-action">Action</label>
-                    <input type="text" id="new-gest-action" placeholder="e.g., key:F1">
-                </div>
-                <div class="form-group">
-                    <label for="new-gest-threshold">Custom Threshold (Optional)</label>
-                    <input type="number" id="new-gest-threshold" min="0.5" max="1.0" step="0.01" placeholder="Global default">
+                <div id="gesture-props">
+                    <div class="form-group">
+                        <label for="new-gest-name">Name</label>
+                        <input type="text" id="new-gest-name" placeholder="e.g., flick-up">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-gest-action">Action</label>
+                        <input type="text" id="new-gest-action" placeholder="e.g., key:F1">
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="override-threshold" onchange="toggleThresholdInput()">
+                            <label for="override-threshold">Override Global Threshold</label>
+                        </div>
+                        <input type="number" id="new-gest-threshold" min="0.5" max="1.0" step="0.01" disabled>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="new-gest-sound">Sound Path</label>
+                        <input type="text" id="new-gest-sound" placeholder="sounds/success.wav">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="new-gest-volume">Volume (0-100)</label>
+                        <input type="number" id="new-gest-volume" min="0" max="100" value="100">
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <div class="checkbox-group">
+                <div class="persistent-box">
+                    <h3>
                         <input type="checkbox" id="enable-speed-filter" onchange="toggleFilterInputs()">
-                        <label for="enable-speed-filter">Enable Speed Filter</label>
-                    </div>
-                    <div id="speed-inputs" class="filter-section" style="display: none;">
-                        <div style="display: flex; gap: 10px;">
-                            <div style="flex: 1;">
-                                <label style="font-size: 12px;">Min (px/ms)</label>
-                                <input type="number" id="new-gest-min-speed" step="0.01">
-                            </div>
-                            <div style="flex: 1;">
-                                <label style="font-size: 12px;">Max (px/ms)</label>
-                                <input type="number" id="new-gest-max-speed" step="0.01">
-                            </div>
+                        Speed Filter (px/ms)
+                    </h3>
+                    <div id="speed-inputs">
+                        <div class="form-group">
+                            <label>Min Speed</label>
+                            <input type="number" id="new-gest-min-speed" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>Max Speed</label>
+                            <input type="number" id="new-gest-max-speed" step="0.01">
                         </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <div class="checkbox-group">
+                <div class="persistent-box">
+                    <h3>
                         <input type="checkbox" id="enable-len-filter" onchange="toggleFilterInputs()">
-                        <label for="enable-len-filter">Enable Length Filter</label>
-                    </div>
-                    <div id="len-inputs" class="filter-section" style="display: none;">
-                        <div style="display: flex; gap: 10px;">
-                            <div style="flex: 1;">
-                                <label style="font-size: 12px;">Min (px)</label>
-                                <input type="number" id="new-gest-min-len">
-                            </div>
-                            <div style="flex: 1;">
-                                <label style="font-size: 12px;">Max (px)</label>
-                                <input type="number" id="new-gest-max-len">
-                            </div>
+                        Length Filter (px)
+                    </h3>
+                    <div id="len-inputs">
+                        <div class="form-group">
+                            <label>Min Length</label>
+                            <input type="number" id="new-gest-min-len">
+                        </div>
+                        <div class="form-group">
+                            <label>Max Length</label>
+                            <input type="number" id="new-gest-max-len">
                         </div>
                     </div>
                 </div>
@@ -487,6 +544,7 @@
         let configData = null;
         let pendingCapture = null;
         let originalName = null;
+        let allGestures = [];
 
         // UI Elements
         const dot = document.getElementById('ws-dot');
@@ -528,15 +586,21 @@
 
         function toggleFilterInputs() {
             const speedEnabled = document.getElementById('enable-speed-filter').checked;
-            document.getElementById('speed-inputs').style.display = speedEnabled ? 'block' : 'none';
+            document.querySelectorAll('#speed-inputs input').forEach(i => i.disabled = !speedEnabled);
 
             const lenEnabled = document.getElementById('enable-len-filter').checked;
-            document.getElementById('len-inputs').style.display = lenEnabled ? 'block' : 'none';
+            document.querySelectorAll('#len-inputs input').forEach(i => i.disabled = !lenEnabled);
+        }
+
+        function toggleThresholdInput() {
+            const enabled = document.getElementById('override-threshold').checked;
+            document.getElementById('new-gest-threshold').disabled = !enabled;
         }
 
         function toggleTraceFinesseInputs() {
             const finesseEnabled = document.getElementById('trace-finesse-enabled').checked;
-            document.getElementById('trace-finesse-inputs').style.display = finesseEnabled ? 'block' : 'none';
+            const inputs = document.querySelectorAll('#trace-finesse-inputs input');
+            inputs.forEach(input => input.disabled = !finesseEnabled);
         }
 
         function switchTab(tab) {
@@ -571,6 +635,7 @@
                     configData = msg.data;
                     populateSettings();
                 } else if (msg.type === 'gestures') {
+                    allGestures = msg.data;
                     renderGestures(msg.data);
                 } else if (msg.type === 'capture_result') {
                     handleCaptureResult(msg);
@@ -634,6 +699,7 @@
                 document.getElementById('trigger-btn1').value = trigger.key1;
             }
             updateTriggerUI();
+            toggleTraceFinesseInputs();
         }
 
         function saveConfig() {
@@ -715,6 +781,8 @@
                 });
                 // Last one wins for display of action/threshold/constraints
                 groups[g.name].action = g.action;
+                groups[g.name].sound = g.sound;
+                groups[g.name].volume = g.volume;
                 groups[g.name].confidence_threshold = g.confidence_threshold;
                 groups[g.name].min_speed = g.min_speed_px_per_ms;
                 groups[g.name].max_speed = g.max_speed_px_per_ms;
@@ -726,22 +794,15 @@
                 const actionStr = formatAction(g.action);
                 const threshStr = g.confidence_threshold !== null ? `(Threshold: ${g.confidence_threshold})` : '';
 
-                // Calculate aggregates
-                const speeds = g.templates.map(t => t.speed);
-                const lengths = g.templates.map(t => t.length);
-                const avgSpeed = (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(2);
-                const avgLen = Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length);
-                const minSpeed = Math.min(...speeds).toFixed(2);
-                const maxSpeed = Math.max(...speeds).toFixed(2);
-                const minLen = Math.round(Math.min(...lengths));
-                const maxLen = Math.round(Math.max(...lengths));
+                let filterBadges = '';
+                if (g.min_speed !== null || g.max_speed !== null) {
+                    filterBadges += `<span class="badge">Speed: ${g.min_speed || '0'} - ${g.max_speed || '∞'}</span>`;
+                }
+                if (g.min_len !== null || g.max_len !== null) {
+                    filterBadges += `<span class="badge">Length: ${g.min_len || '0'} - ${g.max_len || '∞'}</span>`;
+                }
 
-                const filterStats = `
-                    <div style="margin-top: 4px;">
-                        <span class="badge" title="Aggregate Speed">Spd: ${minSpeed} - ${maxSpeed} (avg: ${avgSpeed}) px/ms</span>
-                        <span class="badge" title="Aggregate Length">Len: ${minLen} - ${maxLen} (avg: ${avgLen}) px</span>
-                    </div>
-                `;
+                const filtersHtml = filterBadges ? `<div style="margin-top: 4px;">Filters: ${filterBadges}</div>` : '';
                 
                 const div = document.createElement('div');
                 div.className = 'gesture-item';
@@ -772,12 +833,12 @@
                         <div class="gesture-info">
                             <h3>${g.name} <span style="font-size: 12px; background: var(--border-color); padding: 2px 6px; border-radius: 10px; margin-left: 8px;">${g.templates.length} templates</span></h3>
                             <p>Action: ${actionStr} ${threshStr}</p>
-                            ${filterStats}
+                            ${filtersHtml}
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button class="secondary" onclick="toggleTemplates('${g.name}')">Templates</button>
-                            <button class="secondary" onclick="addTemplate('${g.name}', '${actionStr}', ${g.confidence_threshold}, ${g.min_speed}, ${g.max_speed}, ${g.min_len}, ${g.max_len})">Add Template</button>
-                            <button class="secondary" onclick="editGesture('${g.name}', '${actionStr}', ${g.confidence_threshold}, ${g.min_speed}, ${g.max_speed}, ${g.min_len}, ${g.max_len})">Edit</button>
+                            <button class="secondary" onclick="addTemplate('${g.name}')">Add Template</button>
+                            <button class="secondary" onclick="editGesture('${g.name}')">Edit</button>
                             <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
                         </div>
                     </div>
@@ -856,6 +917,12 @@
             ws.send(JSON.stringify({ type: 'reload' }));
         }
 
+        function restartDaemon() {
+            if (confirm("Restart the QuickDraw daemon? This will disconnect the current session.")) {
+                ws.send(JSON.stringify({ type: 'restart_daemon' }));
+            }
+        }
+
         // Modal and Recording Logic
         let isEditing = false;
         let isAddingTemplate = false;
@@ -869,6 +936,8 @@
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
+            document.getElementById('gesture-props').style.display = 'block';
+            document.getElementById('aggregate-stats').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = true;
             document.getElementById('save-gest-btn').innerText = 'Save Gesture';
 
@@ -876,14 +945,26 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            document.getElementById('new-gest-name').value = '';
+            document.getElementById('new-gest-action').value = '';
+            document.getElementById('override-threshold').checked = false;
+            document.getElementById('new-gest-threshold').value = '';
+            document.getElementById('new-gest-sound').value = '';
+            document.getElementById('new-gest-volume').value = 100;
             document.getElementById('enable-speed-filter').checked = false;
+            document.getElementById('new-gest-min-speed').value = '';
+            document.getElementById('new-gest-max-speed').value = '';
             document.getElementById('enable-len-filter').checked = false;
+            document.getElementById('new-gest-min-len').value = '';
+            document.getElementById('new-gest-max-len').value = '';
+
             toggleFilterInputs();
+            toggleThresholdInput();
 
             ws.send(JSON.stringify({ type: 'start_capture' }));
         }
 
-        function addTemplate(name, actionStr, threshold, min_speed, max_speed, min_len, max_len) {
+        function addTemplate(name) {
             isEditing = false;
             isAddingTemplate = true;
             isCapturing = true;
@@ -891,6 +972,9 @@
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
+            document.getElementById('gesture-props').style.display = 'none';
+            document.querySelectorAll('#record-modal .persistent-box').forEach(box => box.style.display = 'none');
+            document.getElementById('aggregate-stats').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = true;
             document.getElementById('save-gest-btn').innerText = 'Add Template';
 
@@ -898,59 +982,82 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            // Set the name so we know which gesture to add to
             document.getElementById('new-gest-name').value = name;
-            document.getElementById('new-gest-action').value = actionStr;
-            document.getElementById('new-gest-threshold').value = threshold || '';
-
-            document.getElementById('enable-speed-filter').checked = (min_speed !== null || max_speed !== null);
-            document.getElementById('new-gest-min-speed').value = min_speed || '';
-            document.getElementById('new-gest-max-speed').value = max_speed || '';
-
-            document.getElementById('enable-len-filter').checked = (min_len !== null || max_len !== null);
-            document.getElementById('new-gest-min-len').value = min_len || '';
-            document.getElementById('new-gest-max-len').value = max_len || '';
-
-            toggleFilterInputs();
 
             ws.send(JSON.stringify({ type: 'start_capture' }));
         }
 
-        function editGesture(name, actionStr, threshold, min_speed, max_speed, min_len, max_len) {
+        function editGesture(name) {
             isEditing = true;
             isAddingTemplate = false;
-            isCapturing = false;  // edit mode never starts a capture
+            isCapturing = false;
             originalName = name;
-            document.getElementById('modal-title').innerText = 'Edit Gesture';
+            document.getElementById('modal-title').innerText = 'Edit Gesture: ' + name;
             document.getElementById('record-modal').classList.add('active');
             document.getElementById('waiting-msg').style.display = 'none';
             document.getElementById('gesture-details').style.display = 'block';
+            document.getElementById('gesture-props').style.display = 'block';
             document.getElementById('save-gest-btn').disabled = false;
             document.getElementById('save-gest-btn').innerText = 'Update Gesture';
 
             // Hide canvas for edit
-            const canvas = document.getElementById('gesture-canvas');
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
             document.querySelector('.canvas-container').style.display = 'none';
 
-            document.getElementById('new-gest-name').value = name;
-            document.getElementById('new-gest-action').value = actionStr;
-            document.getElementById('new-gest-threshold').value = threshold || '';
+            // Find gesture data
+            const gestures = allGestures.filter(g => g.name === name);
+            if (gestures.length === 0) return;
+            const g = gestures[gestures.length - 1]; // Last one wins
 
-            document.getElementById('enable-speed-filter').checked = (min_speed !== null || max_speed !== null);
-            document.getElementById('new-gest-min-speed').value = min_speed || '';
-            document.getElementById('new-gest-max-speed').value = max_speed || '';
+            // Calculate aggregates for stats display
+            const temps = gestures.map(gest => {
+                const len = calculatePathLength(gest.raw.points);
+                const spd = calculateSpeed(gest.raw.points, gest.raw.timestamps);
+                return { len, spd };
+            });
 
-            document.getElementById('enable-len-filter').checked = (min_len !== null || max_len !== null);
-            document.getElementById('new-gest-min-len').value = min_len || '';
-            document.getElementById('new-gest-max-len').value = max_len || '';
+            const speeds = temps.map(t => t.spd);
+            const lengths = temps.map(t => t.len);
+            const avgSpeed = (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(2);
+            const avgLen = Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length);
+            const minSpeed = Math.min(...speeds).toFixed(2);
+            const maxSpeed = Math.max(...speeds).toFixed(2);
+            const minLen = Math.round(Math.min(...lengths));
+            const maxLen = Math.round(Math.max(...lengths));
+
+            const statsDiv = document.getElementById('aggregate-stats');
+            statsDiv.style.display = 'block';
+            statsDiv.innerHTML = `
+                <strong>Template Statistics (${gestures.length} samples):</strong><br>
+                Speed: ${minSpeed} - ${maxSpeed} (avg: ${avgSpeed}) px/ms |
+                Length: ${minLen} - ${maxLen} (avg: ${avgLen}) px
+            `;
+
+            document.getElementById('new-gest-name').value = g.name;
+            document.getElementById('new-gest-action').value = formatAction(g.action);
+
+            document.getElementById('override-threshold').checked = g.confidence_threshold !== null;
+            document.getElementById('new-gest-threshold').value = g.confidence_threshold || '';
+
+            document.getElementById('new-gest-sound').value = g.sound || '';
+            document.getElementById('new-gest-volume').value = Math.round((g.volume || 1.0) * 100);
+
+            document.getElementById('enable-speed-filter').checked = (g.min_speed_px_per_ms !== null || g.max_speed_px_per_ms !== null);
+            document.getElementById('new-gest-min-speed').value = g.min_speed_px_per_ms || '';
+            document.getElementById('new-gest-max-speed').value = g.max_speed_px_per_ms || '';
+
+            document.getElementById('enable-len-filter').checked = (g.min_path_length_px !== null || g.max_path_length_px !== null);
+            document.getElementById('new-gest-min-len').value = g.min_path_length_px || '';
+            document.getElementById('new-gest-max-len').value = g.max_path_length_px || '';
 
             toggleFilterInputs();
+            toggleThresholdInput();
         }
 
         function closeModal() {
             document.getElementById('record-modal').classList.remove('active');
             document.querySelector('.canvas-container').style.display = 'block';
+            document.querySelectorAll('#record-modal .persistent-box').forEach(box => box.style.display = 'block');
             // Only send cancel_capture if we were actually waiting for one.
             // Sending it from edit mode (or when already idle) creates a stale
             // capture_cancelled echo that closes the next modal open immediately.
@@ -964,30 +1071,22 @@
 
         function handleCaptureResult(msg) {
             pendingCapture = msg;
-            isCapturing = false;  // gesture received, no longer waiting for capture
+            isCapturing = false;
 
             document.getElementById('waiting-msg').style.display = 'none';
             document.getElementById('gesture-details').style.display = 'block';
             document.getElementById('save-gest-btn').disabled = false;
             
             if (!isAddingTemplate) {
-                document.getElementById('new-gest-name').value = '';
-                document.getElementById('new-gest-action').value = '';
-                document.getElementById('new-gest-threshold').value = '';
-
-                // For a completely new gesture, we auto-enable filters with a buffer
+                // Show statistics for the just recorded gesture as a reference
                 const len = calculatePathLength(msg.raw.points);
                 const speed = calculateSpeed(msg.raw.points, msg.raw.timestamps);
 
-                document.getElementById('enable-speed-filter').checked = true;
-                document.getElementById('new-gest-min-speed').value = (speed * 0.7).toFixed(2);
-                document.getElementById('new-gest-max-speed').value = (speed * 1.3).toFixed(2);
-
-                document.getElementById('enable-len-filter').checked = true;
-                document.getElementById('new-gest-min-len').value = Math.round(len * 0.7);
-                document.getElementById('new-gest-max-len').value = Math.round(len * 1.3);
-
-                toggleFilterInputs();
+                const statsDiv = document.getElementById('aggregate-stats');
+                statsDiv.style.display = 'block';
+                statsDiv.innerHTML = `
+                    <strong>New Capture Stats:</strong> Speed: ${speed.toFixed(2)} px/ms | Length: ${Math.round(len)} px
+                `;
             }
 
             drawPath(msg.raw.points);
@@ -1060,29 +1159,41 @@
         function saveNewGesture() {
             const name = document.getElementById('new-gest-name').value.trim();
             const actionStr = document.getElementById('new-gest-action').value.trim();
+
+            const overrideThreshold = document.getElementById('override-threshold').checked;
             const thresholdStr = document.getElementById('new-gest-threshold').value.trim();
 
-            if (!name || !actionStr) {
+            if (!name || (!isAddingTemplate && !actionStr)) {
                 alert("Name and Action are required.");
                 return;
             }
 
             let action;
-            try {
-                action = parseAction(actionStr);
-            } catch (e) {
-                alert(e.message);
-                return;
+            if (!isAddingTemplate) {
+                try {
+                    action = parseAction(actionStr);
+                } catch (e) {
+                    alert(e.message);
+                    return;
+                }
+            } else {
+                // For Add Template, we don't change the action, but the server expects one in save_gesture
+                // We'll find the existing action
+                const existing = allGestures.find(g => g.name === name);
+                action = existing ? existing.action : null;
             }
 
             let threshold = null;
-            if (thresholdStr) {
+            if (overrideThreshold && thresholdStr) {
                 threshold = parseFloat(thresholdStr);
                 if (isNaN(threshold) || threshold < 0.5 || threshold > 1.0) {
                     alert("Threshold must be between 0.5 and 1.0");
                     return;
                 }
             }
+
+            const sound = document.getElementById('new-gest-sound').value.trim() || null;
+            const volume = parseFloat(document.getElementById('new-gest-volume').value) / 100.0;
 
             const speedEnabled = document.getElementById('enable-speed-filter').checked;
             const min_speed = speedEnabled ? parseFloat(document.getElementById('new-gest-min-speed').value) || null : null;
@@ -1098,6 +1209,8 @@
                     old_name: originalName,
                     new_name: name,
                     action: action,
+                    sound: sound,
+                    volume: volume,
                     confidence_threshold: threshold,
                     min_speed_px_per_ms: min_speed,
                     max_speed_px_per_ms: max_speed,
@@ -1106,20 +1219,44 @@
                 }));
             } else {
                 if (!pendingCapture) return;
+
+                // If adding template, inherit from existing gesture properties
+                let finalSound = sound;
+                let finalVolume = volume;
+                let finalThreshold = threshold;
+                let finalMinSpeed = min_speed;
+                let finalMaxSpeed = max_speed;
+                let finalMinLen = min_len;
+                let finalMaxLen = max_len;
+
+                if (isAddingTemplate) {
+                    const existing = allGestures.filter(g => g.name === name).pop();
+                    if (existing) {
+                        finalSound = existing.sound;
+                        finalVolume = existing.volume;
+                        finalThreshold = existing.confidence_threshold;
+                        finalMinSpeed = existing.min_speed_px_per_ms;
+                        finalMaxSpeed = existing.max_speed_px_per_ms;
+                        finalMinLen = existing.min_path_length_px;
+                        finalMaxLen = existing.max_path_length_px;
+                    }
+                }
+
                 const gestureConfig = {
                     name: name,
                     action: action,
-                    sound: null,
+                    sound: finalSound,
+                    volume: finalVolume,
                     pattern: {
                         algorithm: pendingCapture.processed.algorithm,
                         template_points: pendingCapture.processed.template_points
                     },
                     raw: pendingCapture.raw,
-                    confidence_threshold: threshold,
-                    min_speed_px_per_ms: min_speed,
-                    max_speed_px_per_ms: max_speed,
-                    min_path_length_px: min_len,
-                    max_path_length_px: max_len
+                    confidence_threshold: finalThreshold,
+                    min_speed_px_per_ms: finalMinSpeed,
+                    max_speed_px_per_ms: finalMaxSpeed,
+                    min_path_length_px: finalMinLen,
+                    max_path_length_px: finalMaxLen
                 };
 
                 ws.send(JSON.stringify({
