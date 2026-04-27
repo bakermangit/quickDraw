@@ -1,9 +1,9 @@
-# Task: Web UI Desktop Overhaul and Daemon Restart
+# Task: Web UI Desktop Overhaul and UX Refinements
 
 ## Status: Completed
 
 ## Overview
-This task involved a major overhaul of the QuickDraw web configuration interface to transition from a mobile-style vertical stack to a space-efficient, horizontal, desktop-first layout. Additionally, the backend was updated to support a seamless daemon restart command and more granular per-gesture configuration (audio overrides and explicit threshold overrides).
+This task involved a major overhaul of the QuickDraw web configuration interface to transition from a mobile-style vertical stack to a space-efficient, horizontal, desktop-first layout. Additionally, the backend was updated for robust global audio control, streamlined gesture management, and various UX enhancements.
 
 ## Changes
 
@@ -11,37 +11,34 @@ This task involved a major overhaul of the QuickDraw web configuration interface
 - **Desktop-First Layout**:
     - Converted `.form-group` elements to a horizontal layout using Flexbox.
     - Labels now sit on the left, with compact inputs/dropdowns (fixed 200px width) on the right.
+    - Fixed specific alignment issues for combo trigger button inputs.
 - **Input Improvements**:
     - Replaced all wide `<input type="range">` sliders with compact `<input type="number">` boxes for precise control.
 - **Persistent Settings Groups**:
     - Replaced the "Unhide" behavior with persistent visual boxes (`.persistent-box`).
-    - When a feature (like Trace Finesse) is toggled off, the inputs within the box are now `disabled` (grayed out) rather than hidden.
+    - When a feature (like Trace Finesse or Audio) is toggled off, the inputs within the box are now `disabled` (grayed out) rather than hidden.
 - **Streamlined Modals**:
-    - **Add Template**: Simplified to ONLY show the capture canvas. Gesture-level properties (name, action) are hidden as they are inherited from the parent gesture.
+    - **Add Template**: Simplified to ONLY show the capture canvas. Gesture-level properties are hidden as they are inherited. Added a **"Reset" button** to quickly discard a recording and try again.
     - **Edit Gesture**:
-        - Moved aggregate statistics (Min, Max, Avg for Length and Speed) to the top of the modal as a reference guide.
-        - Added "Override Global Threshold" checkbox to explicitly enable/disable the per-gesture confidence threshold.
-        - Exposed `sound` path and `volume` (0-100) inputs.
-    - **Recording**: Removed auto-calculation buffers (±30%). Users now use the reference statistics to manually set their bounds.
+        - Moved aggregate statistics to the top of the modal within their respective filter areas.
+        - Refined stats format: `Templates = X; Min = Y, Max = Z, Avg = A`.
+        - Added toggleable overrides for both **Confidence Threshold** and **Custom Sound**.
 - **Gesture List**:
-    - Removed aggregate statistics from the main gesture header.
-    - Added badges that dynamically show which filters (Speed/Length) are currently active for a gesture.
-- **Gesture Templates Persistence**:
-    - Implemented state tracking for the template preview lists. The "Templates" section for a gesture now remains open even after adding a new template or updating the list.
-- **Recording Reset**:
-    - Added a "Reset" button to the capture modal, allowing users to discard a recording and immediately try again.
-
-### 2. Backend (src/server/handlers.rs & src/config.rs)
-- **Global Audio Volume**:
-    - Replaced per-gesture volume settings with a single "Audio Volume" slider in the main Settings tab.
-    - Switched all audio playback (including WAV) to use the Windows MCI (Media Control Interface) to enable consistent volume control.
-
-### 2. Backend (src/server/handlers.rs & src/config.rs)
+    - Removed aggregate statistics from the main gesture header and replaced them with active filter badges (e.g., `Speed > 1.2`).
+    - Implemented **Template Expansion Persistence**: The "Templates" section for a gesture now remains open even after adding a new template or updating the list.
 - **Restart Daemon (Removed)**:
-    - An experimental `RestartDaemon` command was briefly implemented but subsequently removed from both the UI and backend due to stability issues (crashes on repeated use).
-- **Audio Configuration**:
+    - An experimental restart feature was removed from the UI due to stability issues on subsequent restarts.
+
+### 2. Backend (src/audio/mod.rs, src/server/handlers.rs & src/config.rs)
+- **Global Audio Volume**:
     - Added `volume: f64` to `AudioConfig` in `src/config.rs`.
-    - Updated `AudioPlayer` to apply this global volume setting to all `mciSendStringW` playback commands.
+    - Removed per-gesture volume overrides for simplicity and predictability.
+    - Updated `AudioPlayer` to apply this global volume setting to all MCI playback commands.
+- **MCI Reliability**:
+    - Updated MCI `open` command to explicitly use `type waveaudio` for `.wav` files, fixing a bug where WAV files ignored volume settings.
+- **Message Cleanup**:
+    - Removed `RestartDaemon` from `ClientMessage`.
+    - Removed `volume` field from `UpdateGesture` message.
 
 ## Architectural Notes for AI Architect
 

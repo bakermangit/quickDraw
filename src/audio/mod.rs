@@ -50,10 +50,10 @@ impl AudioPlayer {
         self.play_mci(&absolute_path);
     }
 
-    fn play_mci(&self, _path: &std::path::Path) {
+    fn play_mci(&self, path: &std::path::Path) {
         #[cfg(windows)]
         {
-            let path_str = _path.to_string_lossy();
+            let path_str = path.to_string_lossy();
             // MCI volume is 0-1000
             let volume = (self.config.volume * 1000.0).clamp(0.0, 1000.0) as u32;
 
