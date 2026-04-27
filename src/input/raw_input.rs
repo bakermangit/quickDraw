@@ -122,6 +122,12 @@ impl InputSource for RawInputSource {
     }
 }
 
+impl Drop for RawInputSource {
+    fn drop(&mut self) {
+        let _ = self.stop();
+    }
+}
+
 #[cfg(windows)]
 unsafe extern "system" fn raw_input_wnd_proc(
     hwnd: HWND,

@@ -1,7 +1,7 @@
 #[cfg(windows)]
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 #[cfg(windows)]
-use std::sync::OnceLock;
+use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use anyhow::{anyhow, Result};
 use tokio::sync::mpsc;
@@ -23,7 +23,7 @@ use crate::types::{InputEvent, InputEventType, MouseButton};
 use super::InputSource;
 
 #[cfg(windows)]
-static EVENT_TX: OnceLock<mpsc::Sender<InputEvent>> = OnceLock::new();
+static EVENT_TX: Mutex<Option<mpsc::Sender<InputEvent>>> = Mutex::new(None);
 #[cfg(windows)]
 static SHOULD_BLOCK: AtomicBool = AtomicBool::new(false);
 #[cfg(windows)]
@@ -37,9 +37,6 @@ struct SendHhook(HHOOK);
 unsafe impl Send for SendHhook {}
 #[cfg(windows)]
 unsafe impl Sync for SendHhook {}
-
-#[cfg(windows)]
-static HOOK_HANDLE: OnceLock<SendHhook> = OnceLock::new();
 
 pub struct HookInputSource {
     thread_handle: Option<JoinHandle<()>>,
@@ -69,7 +66,10 @@ impl InputSource for HookInputSource {
                 return Err(anyhow!("HookInputSource is already running"));
             }
 
-            let _ = EVENT_TX.set(_tx);
+            {
+                let mut guard = EVENT_TX.lock().unwrap();
+                *guard = Some(_tx);
+            }
 
             let (id_tx, id_rx) = std::sync::mpsc::channel();
 
@@ -90,8 +90,6 @@ impl InputSource for HookInputSource {
                         h_instance,
                         0,
                     ).expect("Failed to install mouse hook");
-
-                    let _ = HOOK_HANDLE.set(SendHhook(hook));
 
                     let mut msg = MSG::default();
                     while GetMessageW(&mut msg, HWND::default(), 0, 0).into() {
@@ -138,6 +136,12 @@ impl InputSource for HookInputSource {
 
     fn name(&self) -> &str {
         "hook"
+    }
+}
+
+impl Drop for HookInputSource {
+    fn drop(&mut self) {
+        let _ = self.stop();
     }
 }
 
@@ -211,12 +215,14 @@ unsafe extern "system" fn low_level_mouse_proc(
         };
 
         if let Some(et) = event_type {
-            if let Some(tx) = EVENT_TX.get() {
-                let event = InputEvent {
-                    event_type: et,
-                    timestamp: get_timestamp(),
-                };
-                let _ = tx.blocking_send(event);
+            if let Ok(guard) = EVENT_TX.lock() {
+                if let Some(tx) = guard.as_ref() {
+                    let event = InputEvent {
+                        event_type: et,
+                        timestamp: get_timestamp(),
+                    };
+                    let _ = tx.blocking_send(event);
+                }
             }
         }
 
