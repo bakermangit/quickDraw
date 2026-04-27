@@ -343,6 +343,37 @@
                 <label for="audio-enabled">Audio Enabled</label>
             </div>
 
+            <h3>Trace</h3>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="trace-enabled">
+                <label for="trace-enabled">Trace Overlay Enabled</label>
+            </div>
+
+            <div class="form-group">
+                <label for="trace-color">Trace Color</label>
+                <input type="text" id="trace-color" value="#BE5103">
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="trace-finesse" onchange="updateTraceUI()">
+                <label for="trace-finesse">Trace Finesse (Dynamic Width)</label>
+            </div>
+
+            <div id="trace-finesse-options" style="display: none; border-left: 2px solid var(--accent-color); padding-left: 15px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label for="trace-min-stroke">Min Stroke Width</label>
+                    <input type="number" id="trace-min-stroke" min="1" max="20" value="2">
+                </div>
+                <div class="form-group">
+                    <label for="trace-max-stroke">Max Stroke Width</label>
+                    <input type="number" id="trace-max-stroke" min="1" max="50" value="8">
+                </div>
+                <div class="form-group">
+                    <label for="trace-growth-rate">Growth Rate</label>
+                    <input type="number" id="trace-growth-rate" min="0.01" max="5.0" step="0.01" value="0.2">
+                </div>
+            </div>
+
             <h3>Trigger</h3>
             <div class="form-group">
                 <label for="trigger-type">Trigger Type</label>
@@ -413,6 +444,11 @@
 
         confRange.oninput = function() {
             confVal.innerText = parseFloat(this.value).toFixed(2);
+        }
+
+        function updateTraceUI() {
+            const finesseEnabled = document.getElementById('trace-finesse').checked;
+            document.getElementById('trace-finesse-options').style.display = finesseEnabled ? 'block' : 'none';
         }
 
         function updateTriggerUI() {
@@ -500,6 +536,14 @@
             document.getElementById('cursor-reset').checked = configData.general.cursor_reset;
             document.getElementById('audio-enabled').checked = configData.audio.enabled;
 
+            document.getElementById('trace-enabled').checked = configData.general.trace_overlay_enabled;
+            document.getElementById('trace-color').value = configData.general.trace_color;
+            document.getElementById('trace-finesse').checked = configData.general.trace_finesse_enabled;
+            document.getElementById('trace-min-stroke').value = configData.general.trace_min_stroke;
+            document.getElementById('trace-max-stroke').value = configData.general.trace_max_stroke;
+            document.getElementById('trace-growth-rate').value = configData.general.trace_growth_rate;
+            updateTraceUI();
+
             const trigger = configData.trigger;
             if (trigger.type === 'combo') {
                 document.getElementById('trigger-type').value = 'combo';
@@ -520,6 +564,13 @@
             configData.general.confidence_threshold = parseFloat(document.getElementById('confidence').value);
             configData.general.cursor_reset = document.getElementById('cursor-reset').checked;
             configData.audio.enabled = document.getElementById('audio-enabled').checked;
+
+            configData.general.trace_overlay_enabled = document.getElementById('trace-enabled').checked;
+            configData.general.trace_color = document.getElementById('trace-color').value;
+            configData.general.trace_finesse_enabled = document.getElementById('trace-finesse').checked;
+            configData.general.trace_min_stroke = parseInt(document.getElementById('trace-min-stroke').value);
+            configData.general.trace_max_stroke = parseInt(document.getElementById('trace-max-stroke').value);
+            configData.general.trace_growth_rate = parseFloat(document.getElementById('trace-growth-rate').value);
 
             const triggerType = document.getElementById('trigger-type').value;
             if (triggerType === 'combo') {

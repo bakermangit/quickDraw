@@ -286,7 +286,7 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
     let audio = AudioPlayer::new(config.audio.clone());
 
     let trace_overlay = if config.general.trace_overlay_enabled {
-        Some(TraceOverlay::new(config.general.trace_color.clone()))
+        Some(TraceOverlay::new(config.general.clone()))
     } else {
         None
     };
