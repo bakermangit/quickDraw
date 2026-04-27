@@ -5,13 +5,16 @@
 QuickDraw is structured as a pipeline of three modular stages connected by channels:
 
 ```
-┌──────────────┐     Channel      ┌─────────────────┐     Channel      ┌───────────────┐
-│ Input Source  │────────────────►│  Gesture Engine  │────────────────►│ Output Action  │
-│              │  InputEvent      │                 │   ActionRequest  │               │
-│ (Raw Input)  │                  │ ($1 Recognizer) │                  │ (Keyboard Sim)│
-│ (Hooks)      │                  │ (Rubine)        │                  │ (Mouse Click) │
-│ (Polling)    │                  │ (+ Filters)     │                  │ (Code Exec)   │
-└──────────────┘                  └─────────────────┘                  └───────────────┘
+┌──────────────┐
+│ Input Sources │
+│  (Mouse)     │──────┐
+│  (Keyboard)  │      │ Channel      ┌─────────────────┐     Channel      ┌───────────────┐
+└──────────────┘      └─────────────►│  Gesture Engine  │────────────────►│ Output Action  │
+                      InputEvent     │                 │   ActionRequest  │               │
+                                     │ ($1 Recognizer) │                  │ (Keyboard Sim)│
+                                     │ (Rubine)        │                  │ (Mouse Click) │
+                                     │ (+ Filters)     │                  │ (Code Exec)   │
+                                     └─────────────────┘                  └───────────────┘
         ▲                                                                      │
         │                        ┌─────────────────┐                           │
         │                        │   Config Store   │                           │
@@ -34,8 +37,8 @@ QuickDraw is structured as a pipeline of three modular stages connected by chann
 ### Data Flow
 
 ```
-1. InputSource produces InputEvents (mouse move, button press/release)
-2. TriggerDetector consumes InputEvents, manages trigger state
+1. Decoupled InputSources (Mouse & Keyboard) concurrently produce InputEvents (mouse move, button press/release).
+2. Both feed a single MPSC channel. TriggerDetector consumes InputEvents, manages trigger state.
    - When trigger activates: begins accumulating mouse positions into a GestureCapture
    - When trigger deactivates: sends completed GestureCapture to GestureEngine
 3. GestureEngine receives GestureCapture, runs recognition

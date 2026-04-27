@@ -18,7 +18,6 @@ QuickDraw is a system-wide mouse gesture recognition engine for Windows. The use
 
 ## Non-Goals (for now)
 
-- **Overlay rendering**: No on-screen gesture trail visualization. May be added later.
 - **Cross-platform**: Windows only. Linux/macOS support is out of scope.
 - **Complex UI**: The config frontend is a separate concern, accessed on-demand. The core daemon is headless.
 
@@ -48,14 +47,18 @@ The application is split into two concerns:
 
 JSON is used for IPC messages between daemon and frontend.
 
-### Input Method (v1): Raw Input
+### Input Methods & Decoupling
 
-- Works in exclusive fullscreen (most compatible with games)
-- `RIDEV_INPUTSINK` flag allows background reception without interfering with the game
-- Multiple applications can listen to Raw Input simultaneously — no conflict with games that also use it
-- Standard Windows API — less likely to trigger anti-cheat than hooks
-- **Read-only**: Raw Input can observe mouse events but **cannot block or intercept** them. Mouse movement during a gesture will still reach the game. This is mitigated by the cursor reset feature (see below).
-- Future modules: low-level hooks (can block input), polling (also read-only)
+QuickDraw supports decoupled input sources, allowing users to select separate backends for mouse and keyboard capturing simultaneously.
+
+1. **Raw Input**: 
+   - Works in exclusive fullscreen (most compatible with games)
+   - `RIDEV_INPUTSINK` allows background reception
+   - Read-only: cannot block or intercept input. Mouse movement during a gesture still reaches the game. Mitigated by cursor reset.
+2. **Low-Level Hook (`WH_MOUSE_LL`)**:
+   - Capable of intercepting and swallowing mouse events so they don't reach the underlying application.
+   - Recommended for desktop productivity use cases. May be flagged by aggressive game anti-cheats.
+3. **Polling** (Future): Read-only fallback.
 
 ### Gesture Recognition (v1): $1 Recognizer
 
@@ -118,6 +121,13 @@ action = { type = "key_press", key = "F1" }
 sound = "sounds/flick.wav"         # overrides global success sound
 ```
 
+### Visual Feedback (Trace Overlay)
+
+QuickDraw features an optional native Win32 GDI trace overlay that provides real-time visual feedback of the gesture path.
+- **Zero Overhead**: When disabled in config, the overlay thread and window are entirely bypassed.
+- **Trace Finesse**: The stroke width can dynamically grow from a minimum to a maximum size to visualize gesture origin and velocity/direction.
+- **Click-Through**: Uses `WS_EX_TRANSPARENT` and `WS_EX_LAYERED` to ensure the overlay never steals focus or intercepts clicks.
+
 ### Gesture Creation
 
 Gestures are recorded through the frontend:
@@ -130,13 +140,12 @@ Gestures are recorded through the frontend:
 
 **Raw data is always preserved** alongside the processed representation. This allows re-processing existing gestures when switching algorithms or adding features like velocity filtering.
 
-### Velocity Support
+### Velocity and Length Constraints
 
-For v1, velocity is not part of gesture matching. However:
-- Raw captures include timestamps, so velocity data is always available
-- A simple velocity filter can be layered on top of $1: check total gesture duration against a threshold
-- More sophisticated per-segment velocity profiles are a future enhancement
-- The modular architecture supports composing recognizers with filters without modifying either
+While shape recognition algorithms (like $1) are scale and speed invariant, QuickDraw allows users to enforce minimum and maximum bounds on a gesture's physical path length and drawing speed (pixels per millisecond). 
+- These constraints are evaluated *after* shape matching.
+- Allows differentiating between a "fast, large circle" and a "slow, small circle" even if the shape template is identical.
+- Smart auto-calculation in the frontend pre-fills a ±30% tolerance buffer when recording new gestures.
 
 ## Programming Paradigm
 
