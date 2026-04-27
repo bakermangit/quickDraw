@@ -457,11 +457,6 @@
         <div class="modal">
             <h2 id="modal-title">Record Gesture</h2>
             
-            <!-- Reference Stats in Edit Mode -->
-            <div id="aggregate-stats" style="display: none; background: var(--input-bg); border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 12px; color: var(--text-muted);">
-                <!-- Populated via JS -->
-            </div>
-
             <div class="canvas-container">
                 <div id="waiting-msg" class="waiting-text">Draw your gesture with your configured trigger...</div>
                 <canvas id="gesture-canvas" width="250" height="250"></canvas>
@@ -502,6 +497,7 @@
                         <input type="checkbox" id="enable-speed-filter" onchange="toggleFilterInputs()">
                         Speed Filter (px/ms)
                     </h3>
+                    <div id="speed-stats-ref" style="display: none; font-size: 11px; color: var(--accent-color); margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;"></div>
                     <div id="speed-inputs">
                         <div class="form-group">
                             <label>Min Speed</label>
@@ -519,6 +515,7 @@
                         <input type="checkbox" id="enable-len-filter" onchange="toggleFilterInputs()">
                         Length Filter (px)
                     </h3>
+                    <div id="len-stats-ref" style="display: none; font-size: 11px; color: var(--accent-color); margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;"></div>
                     <div id="len-inputs">
                         <div class="form-group">
                             <label>Min Length</label>
@@ -550,12 +547,6 @@
         const dot = document.getElementById('ws-dot');
         const txt = document.getElementById('ws-text');
         const gestureList = document.getElementById('gesture-list');
-        const confRange = document.getElementById('confidence');
-        const confVal = document.getElementById('conf-val');
-
-        confRange.oninput = function() {
-            confVal.innerText = parseFloat(this.value).toFixed(2);
-        }
 
         function updateTriggerUI() {
             const type = document.getElementById('trigger-type').value;
@@ -674,19 +665,15 @@
             document.getElementById('keyboard-input-method').value = configData.general.keyboard_input_method;
             document.getElementById('recognizer').value = configData.general.recognizer;
             
-            confRange.value = configData.general.confidence_threshold;
-            confVal.innerText = configData.general.confidence_threshold.toFixed(2);
+            document.getElementById('confidence').value = configData.general.confidence_threshold;
             
             document.getElementById('cursor-reset').checked = configData.general.cursor_reset;
             document.getElementById('audio-enabled').checked = configData.audio.enabled;
 
             document.getElementById('trace-finesse-enabled').checked = configData.general.trace_finesse_enabled;
             document.getElementById('trace-min-stroke').value = configData.general.trace_min_stroke;
-            document.getElementById('trace-min-val').innerText = configData.general.trace_min_stroke;
             document.getElementById('trace-max-stroke').value = configData.general.trace_max_stroke;
-            document.getElementById('trace-max-val').innerText = configData.general.trace_max_stroke;
             document.getElementById('trace-growth-rate').value = configData.general.trace_growth_rate;
-            document.getElementById('trace-growth-val').innerText = configData.general.trace_growth_rate.toFixed(2);
             toggleTraceFinesseInputs();
 
             const trigger = configData.trigger;
@@ -937,7 +924,8 @@
             document.getElementById('waiting-msg').style.display = 'block';
             document.getElementById('gesture-details').style.display = 'none';
             document.getElementById('gesture-props').style.display = 'block';
-            document.getElementById('aggregate-stats').style.display = 'none';
+            document.getElementById('speed-stats-ref').style.display = 'none';
+            document.getElementById('len-stats-ref').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = true;
             document.getElementById('save-gest-btn').innerText = 'Save Gesture';
 
@@ -974,7 +962,6 @@
             document.getElementById('gesture-details').style.display = 'none';
             document.getElementById('gesture-props').style.display = 'none';
             document.querySelectorAll('#record-modal .persistent-box').forEach(box => box.style.display = 'none');
-            document.getElementById('aggregate-stats').style.display = 'none';
             document.getElementById('save-gest-btn').disabled = true;
             document.getElementById('save-gest-btn').innerText = 'Add Template';
 
@@ -1025,13 +1012,13 @@
             const minLen = Math.round(Math.min(...lengths));
             const maxLen = Math.round(Math.max(...lengths));
 
-            const statsDiv = document.getElementById('aggregate-stats');
-            statsDiv.style.display = 'block';
-            statsDiv.innerHTML = `
-                <strong>Template Statistics (${gestures.length} samples):</strong><br>
-                Speed: ${minSpeed} - ${maxSpeed} (avg: ${avgSpeed}) px/ms |
-                Length: ${minLen} - ${maxLen} (avg: ${avgLen}) px
-            `;
+            const speedStats = document.getElementById('speed-stats-ref');
+            speedStats.style.display = 'block';
+            speedStats.innerHTML = `Ref (n=${gestures.length}): ${minSpeed} - ${maxSpeed} (avg: ${avgSpeed})`;
+
+            const lenStats = document.getElementById('len-stats-ref');
+            lenStats.style.display = 'block';
+            lenStats.innerHTML = `Ref (n=${gestures.length}): ${minLen} - ${maxLen} (avg: ${avgLen})`;
 
             document.getElementById('new-gest-name').value = g.name;
             document.getElementById('new-gest-action').value = formatAction(g.action);
@@ -1082,11 +1069,13 @@
                 const len = calculatePathLength(msg.raw.points);
                 const speed = calculateSpeed(msg.raw.points, msg.raw.timestamps);
 
-                const statsDiv = document.getElementById('aggregate-stats');
-                statsDiv.style.display = 'block';
-                statsDiv.innerHTML = `
-                    <strong>New Capture Stats:</strong> Speed: ${speed.toFixed(2)} px/ms | Length: ${Math.round(len)} px
-                `;
+                const speedStats = document.getElementById('speed-stats-ref');
+                speedStats.style.display = 'block';
+                speedStats.innerHTML = `Last Capture: ${speed.toFixed(2)} px/ms`;
+
+                const lenStats = document.getElementById('len-stats-ref');
+                lenStats.style.display = 'block';
+                lenStats.innerHTML = `Last Capture: ${Math.round(len)} px`;
             }
 
             drawPath(msg.raw.points);

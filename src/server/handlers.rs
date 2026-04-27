@@ -242,7 +242,17 @@ pub async fn handle_socket(
                         }
                         ClientMessage::RestartDaemon => {
                             if let Ok(exe_path) = std::env::current_exe() {
-                                let _ = std::process::Command::new(exe_path).spawn();
+                                #[cfg(windows)]
+                                {
+                                    // Use 'start' via cmd to detach the new process on Windows
+                                    let _ = std::process::Command::new("cmd")
+                                        .args(["/C", "start", "", &exe_path.to_string_lossy()])
+                                        .spawn();
+                                }
+                                #[cfg(not(windows))]
+                                {
+                                    let _ = std::process::Command::new(exe_path).spawn();
+                                }
                                 std::process::exit(0);
                             }
                         }
