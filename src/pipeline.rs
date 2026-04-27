@@ -297,7 +297,7 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
     let audio = AudioPlayer::new(config.audio.clone());
 
     let trace_overlay = if config.general.trace_overlay_enabled {
-        Some(TraceOverlay::new(config.general.trace_color.clone()))
+        Some(TraceOverlay::new(config.general.clone()))
     } else {
         None
     };
@@ -354,7 +354,7 @@ impl Pipeline {
                             }
                         }
                         TriggerSignal::GestureComplete => {
-                            let origin_pos = accumulator.origin_pos;
+                            let _origin_pos = accumulator.origin_pos;
                             let capture = accumulator.finish();
                             if let Some(overlay) = &self.trace_overlay {
                                 overlay.send(TraceCommand::End);
@@ -444,7 +444,7 @@ impl Pipeline {
                             if self.config.general.cursor_reset {
                                 #[cfg(windows)]
                                 unsafe {
-                                    let _ = SetCursorPos(origin_pos.0 as i32, origin_pos.1 as i32);
+                                    let _ = SetCursorPos(_origin_pos.0 as i32, _origin_pos.1 as i32);
                                 }
                             }
                         }
