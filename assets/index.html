@@ -366,6 +366,29 @@
                 <label for="audio-enabled">Audio Enabled</label>
             </div>
 
+            <h3>Trace Settings</h3>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="trace-finesse-enabled" onchange="toggleTraceFinesseInputs()">
+                <label for="trace-finesse-enabled">Enable Trace Finesse (Dynamic Width)</label>
+            </div>
+
+            <div id="trace-finesse-inputs" style="display: none;">
+                <div class="form-group">
+                    <label for="trace-min-stroke">Min Stroke Width (<span id="trace-min-val">2</span>)</label>
+                    <input type="range" id="trace-min-stroke" min="1" max="20" step="1" value="2" oninput="document.getElementById('trace-min-val').innerText = this.value">
+                </div>
+
+                <div class="form-group">
+                    <label for="trace-max-stroke">Max Stroke Width (<span id="trace-max-val">8</span>)</label>
+                    <input type="range" id="trace-max-stroke" min="1" max="50" step="1" value="8" oninput="document.getElementById('trace-max-val').innerText = this.value">
+                </div>
+
+                <div class="form-group">
+                    <label for="trace-growth-rate">Growth Rate (<span id="trace-growth-val">0.20</span>)</label>
+                    <input type="range" id="trace-growth-rate" min="0.01" max="2.0" step="0.01" value="0.2" oninput="document.getElementById('trace-growth-val').innerText = parseFloat(this.value).toFixed(2)">
+                </div>
+            </div>
+
             <h3>Trigger</h3>
             <div class="form-group">
                 <label for="trigger-type">Trigger Type</label>
@@ -511,6 +534,11 @@
             document.getElementById('len-inputs').style.display = lenEnabled ? 'block' : 'none';
         }
 
+        function toggleTraceFinesseInputs() {
+            const finesseEnabled = document.getElementById('trace-finesse-enabled').checked;
+            document.getElementById('trace-finesse-inputs').style.display = finesseEnabled ? 'block' : 'none';
+        }
+
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -587,6 +615,15 @@
             document.getElementById('cursor-reset').checked = configData.general.cursor_reset;
             document.getElementById('audio-enabled').checked = configData.audio.enabled;
 
+            document.getElementById('trace-finesse-enabled').checked = configData.general.trace_finesse_enabled;
+            document.getElementById('trace-min-stroke').value = configData.general.trace_min_stroke;
+            document.getElementById('trace-min-val').innerText = configData.general.trace_min_stroke;
+            document.getElementById('trace-max-stroke').value = configData.general.trace_max_stroke;
+            document.getElementById('trace-max-val').innerText = configData.general.trace_max_stroke;
+            document.getElementById('trace-growth-rate').value = configData.general.trace_growth_rate;
+            document.getElementById('trace-growth-val').innerText = configData.general.trace_growth_rate.toFixed(2);
+            toggleTraceFinesseInputs();
+
             const trigger = configData.trigger;
             if (trigger.type === 'combo') {
                 document.getElementById('trigger-type').value = 'combo';
@@ -608,6 +645,11 @@
             configData.general.confidence_threshold = parseFloat(document.getElementById('confidence').value);
             configData.general.cursor_reset = document.getElementById('cursor-reset').checked;
             configData.audio.enabled = document.getElementById('audio-enabled').checked;
+
+            configData.general.trace_finesse_enabled = document.getElementById('trace-finesse-enabled').checked;
+            configData.general.trace_min_stroke = parseInt(document.getElementById('trace-min-stroke').value);
+            configData.general.trace_max_stroke = parseInt(document.getElementById('trace-max-stroke').value);
+            configData.general.trace_growth_rate = parseFloat(document.getElementById('trace-growth-rate').value);
 
             const triggerType = document.getElementById('trigger-type').value;
             if (triggerType === 'combo') {

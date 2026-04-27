@@ -25,6 +25,10 @@ impl Default for Config {
                 cursor_reset: true,
                 trace_overlay_enabled: true,
                 trace_color: "#BE5103".to_string(),
+                trace_finesse_enabled: false,
+                trace_min_stroke: 2,
+                trace_max_stroke: 8,
+                trace_growth_rate: 0.2,
             },
             trigger: TriggerConfig::Combo {
                 key1: "Mouse1".to_string(),
@@ -55,6 +59,10 @@ pub struct GeneralConfig {
     pub cursor_reset: bool,
     pub trace_overlay_enabled: bool,
     pub trace_color: String,
+    pub trace_finesse_enabled: bool,
+    pub trace_min_stroke: i32,
+    pub trace_max_stroke: i32,
+    pub trace_growth_rate: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

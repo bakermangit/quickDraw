@@ -40,7 +40,7 @@ fn parse_hex_color(hex: &str) -> u32 {
 }
 
 impl TraceOverlay {
-    pub fn new(color_hex: String) -> Self {
+    pub fn new(config: crate::config::GeneralConfig) -> Self {
         let (command_tx, command_rx) = mpsc::channel();
         #[cfg(windows)]
         let (hwnd_tx, hwnd_rx) = mpsc::channel();
@@ -83,7 +83,7 @@ impl TraceOverlay {
 
                 let _ = hwnd_tx.send(hwnd.0 as isize);
 
-                let color = parse_hex_color(&color_hex);
+                let color = parse_hex_color(&config.trace_color);
                 let transparent_key = COLORREF(0x010101);
 
                 // Setup GDI resources
@@ -102,8 +102,7 @@ impl TraceOverlay {
                 let h_bitmap = CreateDIBSection(hdc_mem, &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
                 let old_bitmap = SelectObject(hdc_mem, h_bitmap);
 
-                let pen = CreatePen(PS_SOLID, 3, COLORREF(color));
-                let old_pen = SelectObject(hdc_mem, pen);
+                let mut current_stroke_width = config.trace_max_stroke as f64;
 
                 let mut msg = MSG::default();
                 loop {
@@ -116,6 +115,12 @@ impl TraceOverlay {
                             while let Ok(cmd) = command_rx.try_recv() {
                                 match cmd {
                                     TraceCommand::Begin(start_x, start_y) => {
+                                        current_stroke_width = if config.trace_finesse_enabled {
+                                            config.trace_min_stroke as f64
+                                        } else {
+                                            config.trace_max_stroke as f64
+                                        };
+
                                         // Fill with transparency key
                                         let h_brush = CreateSolidBrush(transparent_key);
                                         let rect = RECT { left: 0, top: 0, right: width, bottom: height };
@@ -143,7 +148,18 @@ impl TraceOverlay {
                                         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                                     }
                                     TraceCommand::AddPoint(px, py) => {
+                                        let pen = CreatePen(PS_SOLID, current_stroke_width as i32, COLORREF(color));
+                                        let old_pen = SelectObject(hdc_mem, pen);
+
                                         let _ = LineTo(hdc_mem, (px - x as f64) as i32, (py - y as f64) as i32);
+
+                                        SelectObject(hdc_mem, old_pen);
+                                        let _ = DeleteObject(pen);
+
+                                        if config.trace_finesse_enabled {
+                                            current_stroke_width = (current_stroke_width + config.trace_growth_rate)
+                                                .min(config.trace_max_stroke as f64);
+                                        }
 
                                         let pt_src = POINT { x: 0, y: 0 };
                                         let pt_dst = POINT { x, y };
@@ -176,8 +192,6 @@ impl TraceOverlay {
                 }
 
                 // Cleanup
-                SelectObject(hdc_mem, old_pen);
-                let _ = DeleteObject(pen);
                 SelectObject(hdc_mem, old_bitmap);
                 let _ = DeleteObject(h_bitmap);
                 let _ = DeleteDC(hdc_mem);
@@ -186,7 +200,7 @@ impl TraceOverlay {
         });
 
         #[cfg(not(windows))]
-        let _ = (color_hex, command_rx);
+        let _ = (config, command_rx);
 
         #[cfg(windows)]
         let hwnd = hwnd_rx.recv().unwrap_or(0);
