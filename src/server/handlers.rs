@@ -14,7 +14,16 @@ enum ClientMessage {
     GetConfig,
     ListGestures,
     SaveGesture { gesture: GestureConfig },
-    UpdateGesture { old_name: String, new_name: String, action: crate::config::ActionConfig, confidence_threshold: Option<f64> },
+    UpdateGesture {
+        old_name: String,
+        new_name: String,
+        action: crate::config::ActionConfig,
+        confidence_threshold: Option<f64>,
+        min_speed_px_per_ms: Option<f64>,
+        max_speed_px_per_ms: Option<f64>,
+        min_path_length_px: Option<f64>,
+        max_path_length_px: Option<f64>,
+    },
     DeleteGesture { name: String },
     DeleteTemplate { index: usize },
     SetConfig { config: Config },
@@ -93,7 +102,16 @@ pub async fn handle_socket(
                                 let _ = tx.send(ServerMessage::Error { message: "Invalid template index".to_string() }).await;
                             }
                         }
-                        ClientMessage::UpdateGesture { old_name, new_name, action, confidence_threshold } => {
+                        ClientMessage::UpdateGesture {
+                            old_name,
+                            new_name,
+                            action,
+                            confidence_threshold,
+                            min_speed_px_per_ms,
+                            max_speed_px_per_ms,
+                            min_path_length_px,
+                            max_path_length_px,
+                        } => {
                             let mut state_guard = state.lock().await;
                             let profile_name = state_guard.config.general.gesture_profile.clone();
 
@@ -102,6 +120,10 @@ pub async fn handle_socket(
                                     g.name = new_name.clone();
                                     g.action = action.clone();
                                     g.confidence_threshold = confidence_threshold;
+                                    g.min_speed_px_per_ms = min_speed_px_per_ms;
+                                    g.max_speed_px_per_ms = max_speed_px_per_ms;
+                                    g.min_path_length_px = min_path_length_px;
+                                    g.max_path_length_px = max_path_length_px;
                                 }
                             }
                             

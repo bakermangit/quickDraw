@@ -279,6 +279,22 @@
             margin-top: 20px;
         }
 
+        .badge {
+            background: var(--border-color);
+            color: var(--text-muted);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-left: 4px;
+            display: inline-block;
+        }
+
+        .filter-section {
+            margin-top: 10px;
+            padding-left: 10px;
+            border-left: 2px solid var(--border-color);
+        }
+
     </style>
 </head>
 <body>
@@ -389,6 +405,44 @@
                     <label for="new-gest-threshold">Custom Threshold (Optional)</label>
                     <input type="number" id="new-gest-threshold" min="0.5" max="1.0" step="0.01" placeholder="Global default">
                 </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enable-speed-filter" onchange="toggleFilterInputs()">
+                        <label for="enable-speed-filter">Enable Speed Filter</label>
+                    </div>
+                    <div id="speed-inputs" class="filter-section" style="display: none;">
+                        <div style="display: flex; gap: 10px;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 12px;">Min (px/ms)</label>
+                                <input type="number" id="new-gest-min-speed" step="0.01">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 12px;">Max (px/ms)</label>
+                                <input type="number" id="new-gest-max-speed" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enable-len-filter" onchange="toggleFilterInputs()">
+                        <label for="enable-len-filter">Enable Length Filter</label>
+                    </div>
+                    <div id="len-inputs" class="filter-section" style="display: none;">
+                        <div style="display: flex; gap: 10px;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 12px;">Min (px)</label>
+                                <input type="number" id="new-gest-min-len">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 12px;">Max (px)</label>
+                                <input type="number" id="new-gest-max-len">
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="modal-actions">
@@ -423,6 +477,31 @@
             } else {
                 btn2Group.style.display = 'none';
             }
+        }
+
+        function calculatePathLength(points) {
+            let length = 0;
+            for (let i = 1; i < points.length; i++) {
+                const dx = points[i][0] - points[i-1][0];
+                const dy = points[i][1] - points[i-1][1];
+                length += Math.sqrt(dx * dx + dy * dy);
+            }
+            return length;
+        }
+
+        function calculateSpeed(points, timestamps) {
+            if (points.length < 2) return 0;
+            const length = calculatePathLength(points);
+            const duration = timestamps[timestamps.length - 1] - timestamps[0];
+            return duration > 0 ? length / duration : 0;
+        }
+
+        function toggleFilterInputs() {
+            const speedEnabled = document.getElementById('enable-speed-filter').checked;
+            document.getElementById('speed-inputs').style.display = speedEnabled ? 'block' : 'none';
+
+            const lenEnabled = document.getElementById('enable-len-filter').checked;
+            document.getElementById('len-inputs').style.display = lenEnabled ? 'block' : 'none';
         }
 
         function switchTab(tab) {
@@ -567,21 +646,51 @@
                         name: g.name,
                         action: g.action,
                         confidence_threshold: g.confidence_threshold,
+                        min_speed: g.min_speed_px_per_ms,
+                        max_speed: g.max_speed_px_per_ms,
+                        min_len: g.min_path_length_px,
+                        max_len: g.max_path_length_px,
                         templates: []
                     };
                 }
+                const length = calculatePathLength(g.raw.points);
+                const speed = calculateSpeed(g.raw.points, g.raw.timestamps);
+
                 groups[g.name].templates.push({
                     index: index,
-                    points: g.raw.points
+                    points: g.raw.points,
+                    length: length,
+                    speed: speed
                 });
-                // Last one wins for display of action/threshold
+                // Last one wins for display of action/threshold/constraints
                 groups[g.name].action = g.action;
                 groups[g.name].confidence_threshold = g.confidence_threshold;
+                groups[g.name].min_speed = g.min_speed_px_per_ms;
+                groups[g.name].max_speed = g.max_speed_px_per_ms;
+                groups[g.name].min_len = g.min_path_length_px;
+                groups[g.name].max_len = g.max_path_length_px;
             });
 
             Object.values(groups).forEach(g => {
                 const actionStr = formatAction(g.action);
                 const threshStr = g.confidence_threshold !== null ? `(Threshold: ${g.confidence_threshold})` : '';
+
+                // Calculate aggregates
+                const speeds = g.templates.map(t => t.speed);
+                const lengths = g.templates.map(t => t.length);
+                const avgSpeed = (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(2);
+                const avgLen = Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length);
+                const minSpeed = Math.min(...speeds).toFixed(2);
+                const maxSpeed = Math.max(...speeds).toFixed(2);
+                const minLen = Math.round(Math.min(...lengths));
+                const maxLen = Math.round(Math.max(...lengths));
+
+                const filterStats = `
+                    <div style="margin-top: 4px;">
+                        <span class="badge" title="Aggregate Speed">Spd: ${minSpeed} - ${maxSpeed} (avg: ${avgSpeed}) px/ms</span>
+                        <span class="badge" title="Aggregate Length">Len: ${minLen} - ${maxLen} (avg: ${avgLen}) px</span>
+                    </div>
+                `;
                 
                 const div = document.createElement('div');
                 div.className = 'gesture-item';
@@ -592,10 +701,16 @@
                 g.templates.forEach((t, i) => {
                     templatesHtml += `
                         <div style="display: flex; align-items: center; justify-content: space-between; background: var(--panel-bg); margin-top: 8px; padding: 8px; border-radius: 4px;">
-                            <div style="width: 60px; height: 60px; background: var(--input-bg); border-radius: 4px;">
-                                <canvas id="template-canvas-${t.index}" width="60" height="60"></canvas>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="width: 60px; height: 60px; background: var(--input-bg); border-radius: 4px;">
+                                    <canvas id="template-canvas-${t.index}" width="60" height="60"></canvas>
+                                </div>
+                                <div>
+                                    <span style="font-size: 12px; color: var(--text-color); display: block;">Template #${i+1}</span>
+                                    <span class="badge" style="margin-left: 0;">Length: ${Math.round(t.length)}px</span>
+                                    <span class="badge">Speed: ${t.speed.toFixed(2)}px/ms</span>
+                                </div>
                             </div>
-                            <span style="font-size: 12px; color: var(--text-muted);">Template #${i+1}</span>
                             <button class="danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteTemplate(${t.index})">Remove</button>
                         </div>
                     `;
@@ -606,11 +721,12 @@
                         <div class="gesture-info">
                             <h3>${g.name} <span style="font-size: 12px; background: var(--border-color); padding: 2px 6px; border-radius: 10px; margin-left: 8px;">${g.templates.length} templates</span></h3>
                             <p>Action: ${actionStr} ${threshStr}</p>
+                            ${filterStats}
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button class="secondary" onclick="toggleTemplates('${g.name}')">Templates</button>
-                            <button class="secondary" onclick="addTemplate('${g.name}', '${actionStr}', ${g.confidence_threshold})">Add Template</button>
-                            <button class="secondary" onclick="editGesture('${g.name}', '${actionStr}', ${g.confidence_threshold})">Edit</button>
+                            <button class="secondary" onclick="addTemplate('${g.name}', '${actionStr}', ${g.confidence_threshold}, ${g.min_speed}, ${g.max_speed}, ${g.min_len}, ${g.max_len})">Add Template</button>
+                            <button class="secondary" onclick="editGesture('${g.name}', '${actionStr}', ${g.confidence_threshold}, ${g.min_speed}, ${g.max_speed}, ${g.min_len}, ${g.max_len})">Edit</button>
                             <button class="danger" onclick="deleteGesture('${g.name}')">Delete</button>
                         </div>
                     </div>
@@ -709,10 +825,14 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            document.getElementById('enable-speed-filter').checked = false;
+            document.getElementById('enable-len-filter').checked = false;
+            toggleFilterInputs();
+
             ws.send(JSON.stringify({ type: 'start_capture' }));
         }
 
-        function addTemplate(name, actionStr, threshold) {
+        function addTemplate(name, actionStr, threshold, min_speed, max_speed, min_len, max_len) {
             isEditing = false;
             isAddingTemplate = true;
             isCapturing = true;
@@ -731,10 +851,20 @@
             document.getElementById('new-gest-action').value = actionStr;
             document.getElementById('new-gest-threshold').value = threshold || '';
 
+            document.getElementById('enable-speed-filter').checked = (min_speed !== null || max_speed !== null);
+            document.getElementById('new-gest-min-speed').value = min_speed || '';
+            document.getElementById('new-gest-max-speed').value = max_speed || '';
+
+            document.getElementById('enable-len-filter').checked = (min_len !== null || max_len !== null);
+            document.getElementById('new-gest-min-len').value = min_len || '';
+            document.getElementById('new-gest-max-len').value = max_len || '';
+
+            toggleFilterInputs();
+
             ws.send(JSON.stringify({ type: 'start_capture' }));
         }
 
-        function editGesture(name, actionStr, threshold) {
+        function editGesture(name, actionStr, threshold, min_speed, max_speed, min_len, max_len) {
             isEditing = true;
             isAddingTemplate = false;
             isCapturing = false;  // edit mode never starts a capture
@@ -755,6 +885,16 @@
             document.getElementById('new-gest-name').value = name;
             document.getElementById('new-gest-action').value = actionStr;
             document.getElementById('new-gest-threshold').value = threshold || '';
+
+            document.getElementById('enable-speed-filter').checked = (min_speed !== null || max_speed !== null);
+            document.getElementById('new-gest-min-speed').value = min_speed || '';
+            document.getElementById('new-gest-max-speed').value = max_speed || '';
+
+            document.getElementById('enable-len-filter').checked = (min_len !== null || max_len !== null);
+            document.getElementById('new-gest-min-len').value = min_len || '';
+            document.getElementById('new-gest-max-len').value = max_len || '';
+
+            toggleFilterInputs();
         }
 
         function closeModal() {
@@ -783,6 +923,20 @@
                 document.getElementById('new-gest-name').value = '';
                 document.getElementById('new-gest-action').value = '';
                 document.getElementById('new-gest-threshold').value = '';
+
+                // For a completely new gesture, we auto-enable filters with a buffer
+                const len = calculatePathLength(msg.raw.points);
+                const speed = calculateSpeed(msg.raw.points, msg.raw.timestamps);
+
+                document.getElementById('enable-speed-filter').checked = true;
+                document.getElementById('new-gest-min-speed').value = (speed * 0.7).toFixed(2);
+                document.getElementById('new-gest-max-speed').value = (speed * 1.3).toFixed(2);
+
+                document.getElementById('enable-len-filter').checked = true;
+                document.getElementById('new-gest-min-len').value = Math.round(len * 0.7);
+                document.getElementById('new-gest-max-len').value = Math.round(len * 1.3);
+
+                toggleFilterInputs();
             }
 
             drawPath(msg.raw.points);
@@ -879,13 +1033,25 @@
                 }
             }
 
+            const speedEnabled = document.getElementById('enable-speed-filter').checked;
+            const min_speed = speedEnabled ? parseFloat(document.getElementById('new-gest-min-speed').value) || null : null;
+            const max_speed = speedEnabled ? parseFloat(document.getElementById('new-gest-max-speed').value) || null : null;
+
+            const lenEnabled = document.getElementById('enable-len-filter').checked;
+            const min_len = lenEnabled ? parseFloat(document.getElementById('new-gest-min-len').value) || null : null;
+            const max_len = lenEnabled ? parseFloat(document.getElementById('new-gest-max-len').value) || null : null;
+
             if (isEditing) {
                 ws.send(JSON.stringify({
                     type: 'update_gesture',
                     old_name: originalName,
                     new_name: name,
                     action: action,
-                    confidence_threshold: threshold
+                    confidence_threshold: threshold,
+                    min_speed_px_per_ms: min_speed,
+                    max_speed_px_per_ms: max_speed,
+                    min_path_length_px: min_len,
+                    max_path_length_px: max_len
                 }));
             } else {
                 if (!pendingCapture) return;
@@ -898,7 +1064,11 @@
                         template_points: pendingCapture.processed.template_points
                     },
                     raw: pendingCapture.raw,
-                    confidence_threshold: threshold
+                    confidence_threshold: threshold,
+                    min_speed_px_per_ms: min_speed,
+                    max_speed_px_per_ms: max_speed,
+                    min_path_length_px: min_len,
+                    max_path_length_px: max_len
                 };
 
                 ws.send(JSON.stringify({
