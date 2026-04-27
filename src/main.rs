@@ -12,6 +12,7 @@ mod ui;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use server::ServerState;
+use crate::types::SystemCommand;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -38,16 +39,19 @@ async fn main() -> anyhow::Result<()> {
     let gesture_profile = config::load_gesture_profile(&config.general.gesture_profile)?;
 
     let (capture_tx, capture_rx) = tokio::sync::mpsc::channel(1);
+    let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::channel(8);
+
     let pipeline = pipeline::build_pipeline(config.clone(), capture_rx)?;
     
     let shared_state = Arc::new(Mutex::new(ServerState {
         config: config.clone(),
         gesture_profile,
+        capture_tx,
+        cmd_tx: cmd_tx.clone(),
     }));
     
-    tokio::spawn(server::start(config.server.port, shared_state, capture_tx));
+    tokio::spawn(server::start(config.server.port, shared_state.clone()));
 
-    let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::channel(8);
     std::thread::spawn(move || {
         if let Err(e) = tray::start_tray(cmd_tx) {
             tracing::error!("Tray error: {}", e);
@@ -64,15 +68,42 @@ async fn main() -> anyhow::Result<()> {
             }
             Some(cmd) = cmd_rx.recv() => {
                 match cmd {
-                    tray::TrayCommand::Quit => {
-                        tracing::info!("Quit command received from tray");
+                    SystemCommand::Quit => {
+                        tracing::info!("Quit command received");
                         std::process::exit(0);
                     }
-                    tray::TrayCommand::OpenConfig => {
+                    SystemCommand::OpenConfig => {
                         tracing::info!("Opening config UI");
                         let _ = std::process::Command::new("cmd")
                             .args(["/c", "start", "http://localhost:9876"])
                             .spawn();
+                    }
+                    SystemCommand::ReloadEngine => {
+                        tracing::info!("Reloading engine...");
+
+                        // 1. Drop the current pipeline_fut to safely shut down existing input hooks
+                        drop(pipeline_fut);
+
+                        // 2. Load fresh config and gesture profile
+                        let config = config::load_config()?;
+                        let gesture_profile = config::load_gesture_profile(&config.general.gesture_profile)?;
+
+                        // 3. Create a new capture channel
+                        let (capture_tx, capture_rx) = tokio::sync::mpsc::channel(1);
+
+                        // 4. Update the ServerState
+                        {
+                            let mut state = shared_state.lock().await;
+                            state.config = config.clone();
+                            state.gesture_profile = gesture_profile;
+                            state.capture_tx = capture_tx;
+                        }
+
+                        // 5. Build a new pipeline and restart it
+                        let pipeline = pipeline::build_pipeline(config, capture_rx)?;
+                        pipeline_fut = Box::pin(pipeline.run());
+
+                        tracing::info!("Engine reloaded successfully.");
                     }
                 }
             }

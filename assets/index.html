@@ -455,7 +455,10 @@
                 </div>
             </div>
 
-            <button onclick="saveConfig()" style="margin-top: 20px;">Save Settings</button>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button onclick="saveConfig()">Save Settings</button>
+                <button class="secondary" onclick="reloadEngine()">Reload Engine</button>
+            </div>
         </div>
     </main>
 
@@ -708,6 +711,10 @@
             toggleTraceFinesseInputs();
         }
 
+        function reloadEngine() {
+            ws.send(JSON.stringify({ type: 'reload_engine' }));
+        }
+
         function saveConfig() {
             if (!configData) return;
 
@@ -742,6 +749,9 @@
                 type: 'set_config',
                 config: configData
             }));
+
+            // Automatically reload engine after saving config
+            reloadEngine();
         }
 
         function formatAction(action) {
