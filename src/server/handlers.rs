@@ -18,6 +18,7 @@ enum ClientMessage {
         old_name: String,
         new_name: String,
         action: crate::config::ActionConfig,
+        sound: Option<String>,
         confidence_threshold: Option<f64>,
         min_speed_px_per_ms: Option<f64>,
         max_speed_px_per_ms: Option<f64>,
@@ -106,6 +107,7 @@ pub async fn handle_socket(
                             old_name,
                             new_name,
                             action,
+                            sound,
                             confidence_threshold,
                             min_speed_px_per_ms,
                             max_speed_px_per_ms,
@@ -119,6 +121,7 @@ pub async fn handle_socket(
                                 if g.name == old_name {
                                     g.name = new_name.clone();
                                     g.action = action.clone();
+                                    g.sound = sound.clone();
                                     g.confidence_threshold = confidence_threshold;
                                     g.min_speed_px_per_ms = min_speed_px_per_ms;
                                     g.max_speed_px_per_ms = max_speed_px_per_ms;

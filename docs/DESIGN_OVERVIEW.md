@@ -104,6 +104,7 @@ Implemented via `SetCursorPos` Win32 API. The original cursor position is record
 Optional audio cues for gesture results:
 - **Global sounds**: `success.wav` plays on a successful gesture match, `error.wav` plays on a failed match
 - **Per-gesture sounds**: Individual gestures can override the global success sound with a custom audio file
+- **Volume Control**: A global volume setting applies to all audio playback. To ensure consistent volume control across different formats, the engine uses the Windows MCI (Media Control Interface) API with `type mpegvideo` aliases.
 - Sounds are configurable and can be disabled entirely
 
 This helps the user know immediately whether their gesture was recognized, especially important when there's no visual overlay.
@@ -112,6 +113,7 @@ Config example:
 ```toml
 [audio]
 enabled = true
+volume = 0.5                      # global volume (0.0 to 1.0)
 success = "sounds/success.wav"    # global default
 error = "sounds/error.wav"         # global default
 
