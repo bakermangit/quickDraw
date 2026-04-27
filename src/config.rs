@@ -26,8 +26,8 @@ impl Default for Config {
                 trace_overlay_enabled: true,
                 trace_color: "#BE5103".to_string(),
                 trace_finesse_enabled: false,
-                trace_min_stroke: 2,
-                trace_max_stroke: 8,
+                trace_min_stroke: 1,
+                trace_max_stroke: 10,
                 trace_growth_rate: 0.2,
             },
             trigger: TriggerConfig::Combo {
