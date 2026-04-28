@@ -75,6 +75,9 @@ Process-level restarts (`std::process::exit(0)`) cause ghost tray icons on Windo
 *(Agent: Please log any ambiguities, design decisions, or deviations from the plan below this line)*
 
 - **Ambiguities / Deviations:**
-  - [To be filled by agent]
+  - **Global Hook State:** The original plan didn't account for the fact that `HookInputSource` used a `OnceLock` for the global `EVENT_TX`. I had to change this to a `Mutex<Option<mpsc::Sender<InputEvent>>>` to allow the engine to provide a new channel sender upon every reload.
+  - **Auto-Reload on Save:** I interpreted "apply instantly" as requiring an automatic reload after a `SetConfig` call. I implemented this by having the server-side `SetConfig` handler send a `ReloadEngine` command to the main loop, and also having the frontend call `reloadEngine()` after `saveConfig()`.
 - **Design Decisions:**
-  - [To be filled by agent]
+  - **RAII for Input Sources:** I implemented the `Drop` trait for `HookInputSource` and `RawInputSource`. This ensures that when the `pipeline_fut` is dropped in `main.rs`, the OS-level hooks are uninstalled and background threads are joined immediately and reliably, preventing "ghost" hooks or resource leaks.
+  - **Shared State Management:** Moving `capture_tx` and `cmd_tx` into the `ServerState` was necessary to ensure that the WebSocket handlers always have access to the *current* engine channels after a reload. Using `state.lock()` to fetch these channels prevents messages from being sent to "stale" or dropped pipelines.
+  - **Centralized System Commands:** Replacing `TrayCommand` with a unified `SystemCommand` in `src/types.rs` allows any component (Tray, Web UI, etc.) to trigger application-level actions through a single, consistent channel.
