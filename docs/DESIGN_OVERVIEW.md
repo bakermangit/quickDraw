@@ -130,6 +130,14 @@ QuickDraw features an optional native Win32 GDI trace overlay that provides real
 - **Trace Finesse**: The stroke width can dynamically grow from a minimum to a maximum size to visualize gesture origin and velocity/direction.
 - **Click-Through**: Uses `WS_EX_TRANSPARENT` and `WS_EX_LAYERED` to ensure the overlay never steals focus or intercepts clicks.
 
+### Hot-Reloading and Lifecycle Management
+
+To avoid "ghost" tray icons and resource leaks associated with process restarts, QuickDraw uses a native hot-reloading mechanism:
+- **RAII-based Cleanup**: Input sources (`HookInputSource`, `RawInputSource`) implement the `Drop` trait. When the engine pipeline is dropped, OS-level hooks are automatically uninstalled and background threads joined.
+- **Pipeline Rebuild**: The core event loop in `main.rs` can drop the current pipeline future and rebuild it from scratch using fresh configuration from disk. This happens instantly without the process exiting.
+- **Unified Signaling**: A global `SystemCommand` channel allows the Tray Icon and Web UI to trigger application-level actions (Reload, Quit, Open Config) through a single consistent interface.
+- **Auto-Reload**: Saving settings in the Web UI automatically triggers a background engine reload.
+
 ### Gesture Creation
 
 Gestures are recorded through the frontend:
