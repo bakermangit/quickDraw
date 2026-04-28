@@ -6,6 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::config::{Config, GestureConfig};
 use crate::pipeline::CaptureRequest;
+use crate::types::SystemCommand;
 use super::SharedState;
 
 #[derive(Deserialize)]
@@ -31,6 +32,7 @@ enum ClientMessage {
     StartCapture,
     CancelCapture,
     Reload,
+    ReloadEngine,
 }
 
 #[derive(Serialize)]
@@ -47,7 +49,6 @@ enum ServerMessage {
 pub async fn handle_socket(
     socket: WebSocket,
     state: SharedState,
-    capture_tx: mpsc::Sender<CaptureRequest>,
 ) {
     let (mut sender, mut receiver) = socket.split();
     let (tx, mut rx) = mpsc::channel::<ServerMessage>(32);
@@ -158,6 +159,7 @@ pub async fn handle_socket(
                                 if let Err(e) = std::fs::write(&config_path, toml_str) {
                                     let _ = tx.send(ServerMessage::Error { message: e.to_string() }).await;
                                 } else {
+                                    let _ = state_guard.cmd_tx.send(SystemCommand::ReloadEngine).await;
                                     let _ = tx.send(ServerMessage::Ok).await;
                                 }
                             } else {
@@ -173,6 +175,7 @@ pub async fn handle_socket(
                             let (res_tx, res_rx) = oneshot::channel();
                             let (cancel_tx, cancel_rx) = oneshot::channel();
 
+                            let capture_tx = state.lock().await.capture_tx.clone();
                             if capture_tx.send(CaptureRequest { result_tx: res_tx, cancel_rx }).await.is_ok() {
                                 let tx_clone = tx.clone();
                                 let (abort_tx, mut abort_rx) = oneshot::channel::<()>();
@@ -235,6 +238,11 @@ pub async fn handle_socket(
                                     let _ = tx.send(ServerMessage::Error { message: e.to_string() }).await;
                                 }
                             }
+                        }
+                        ClientMessage::ReloadEngine => {
+                            let state_guard = state.lock().await;
+                            let _ = state_guard.cmd_tx.send(SystemCommand::ReloadEngine).await;
+                            let _ = tx.send(ServerMessage::Ok).await;
                         }
                     }
                 }

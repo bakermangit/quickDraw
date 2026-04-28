@@ -4,22 +4,19 @@ use tray_icon::{
     TrayIconBuilder, Icon,
 };
 use tokio::sync::mpsc;
+use crate::types::SystemCommand;
 
-#[derive(Debug, Clone, Copy)]
-pub enum TrayCommand {
-    Quit,
-    OpenConfig,
-}
-
-pub fn start_tray(cmd_tx: mpsc::Sender<TrayCommand>) -> Result<()> {
+pub fn start_tray(cmd_tx: mpsc::Sender<SystemCommand>) -> Result<()> {
     let icon = create_placeholder_icon();
 
     let configure_item = MenuItem::new("Configure...", true, None);
+    let reload_item = MenuItem::new("Reload Engine", true, None);
     let quit_item = MenuItem::new("Quit", true, None);
 
     let tray_menu = Menu::new();
     tray_menu.append_items(&[
         &configure_item,
+        &reload_item,
         &PredefinedMenuItem::separator(),
         &quit_item,
     ])?;
@@ -47,9 +44,11 @@ pub fn start_tray(cmd_tx: mpsc::Sender<TrayCommand>) -> Result<()> {
                 // muda (used by tray-icon) sends events to this receiver.
                 while let Ok(event) = MenuEvent::receiver().try_recv() {
                     if event.id == configure_item.id() {
-                        let _ = cmd_tx.blocking_send(TrayCommand::OpenConfig);
+                        let _ = cmd_tx.blocking_send(SystemCommand::OpenConfig);
+                    } else if event.id == reload_item.id() {
+                        let _ = cmd_tx.blocking_send(SystemCommand::ReloadEngine);
                     } else if event.id == quit_item.id() {
-                        let _ = cmd_tx.blocking_send(TrayCommand::Quit);
+                        let _ = cmd_tx.blocking_send(SystemCommand::Quit);
                     }
                 }
             }

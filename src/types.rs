@@ -109,3 +109,11 @@ pub enum ActionRequest {
     },
     // Future variants: MouseClick, CodeExec, etc.
 }
+
+/// Commands sent to the main event loop to control the system.
+#[derive(Debug, Clone)]
+pub enum SystemCommand {
+    Quit,
+    OpenConfig,
+    ReloadEngine,
+}
