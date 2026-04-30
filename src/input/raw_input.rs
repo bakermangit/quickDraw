@@ -5,13 +5,18 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use tokio::sync::mpsc::Sender;
+#[cfg(windows)]
 use windows::core::w;
+#[cfg(windows)]
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+#[cfg(windows)]
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+#[cfg(windows)]
 use windows::Win32::UI::Input::{
     GetRawInputData, RegisterRawInputDevices, HRAWINPUT, RAWINPUT, RAWINPUTDEVICE,
     RAWINPUTHEADER, RIDEV_INPUTSINK, RIDEV_REMOVE, RID_INPUT,
 };
+#[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW,
     PostMessageW, RegisterClassW, TranslateMessage, HWND_MESSAGE, MSG, WM_INPUT,
@@ -22,58 +27,82 @@ use crate::types::{InputEvent, InputEventType, MouseButton, VirtualKey};
 use super::InputSource;
 
 // HWND is not Send, but we only use it to send a quit message across threads.
+#[cfg(windows)]
 #[derive(Clone, Copy)]
 struct SendHwnd(HWND);
+#[cfg(windows)]
 unsafe impl Send for SendHwnd {}
+#[cfg(windows)]
 unsafe impl Sync for SendHwnd {}
 
 pub struct RawInputSource {
     thread_handle: Option<JoinHandle<()>>,
+    #[cfg(windows)]
     window_handle: Option<SendHwnd>,
+    #[cfg(not(windows))]
+    window_handle: Option<()>,
     is_running: Arc<AtomicBool>,
+    listen_mouse: bool,
+    listen_keyboard: bool,
 }
 
 impl RawInputSource {
-    pub fn new() -> Self {
+    pub fn new(listen_mouse: bool, listen_keyboard: bool) -> Self {
         Self {
             thread_handle: None,
             window_handle: None,
             is_running: Arc::new(AtomicBool::new(false)),
+            listen_mouse,
+            listen_keyboard,
         }
     }
 }
 
 impl InputSource for RawInputSource {
     fn start(&mut self, tx: Sender<InputEvent>) -> Result<()> {
-        if self.thread_handle.is_some() {
-            return Err(anyhow!("RawInputSource is already running"));
-        }
-
-        self.is_running.store(true, Ordering::SeqCst);
-        let is_running = Arc::clone(&self.is_running);
-
-        let (hwnd_tx, hwnd_rx) = std::sync::mpsc::channel();
-
-        let handle = thread::spawn(move || {
-            if let Err(e) = run_message_loop(tx, hwnd_tx, is_running) {
-                tracing::error!("Raw input message loop error: {}", e);
+        #[cfg(windows)]
+        {
+            if self.thread_handle.is_some() {
+                return Err(anyhow!("RawInputSource is already running"));
             }
-        });
 
-        self.thread_handle = Some(handle);
+            self.is_running.store(true, Ordering::SeqCst);
+            let is_running = Arc::clone(&self.is_running);
 
-        if let Ok(hwnd) = hwnd_rx.recv() {
-            self.window_handle = Some(hwnd);
+            let (hwnd_tx, hwnd_rx) = std::sync::mpsc::channel();
+
+            let listen_mouse = self.listen_mouse;
+            let listen_keyboard = self.listen_keyboard;
+
+            let handle = thread::spawn(move || {
+                if let Err(e) = run_message_loop(tx, hwnd_tx, is_running, listen_mouse, listen_keyboard) {
+                    tracing::error!("Raw input message loop error: {}", e);
+                }
+            });
+
+            self.thread_handle = Some(handle);
+
+            if let Ok(hwnd) = hwnd_rx.recv() {
+                self.window_handle = Some(hwnd);
+            }
+
+            Ok(())
         }
-
-        Ok(())
+        #[cfg(not(windows))]
+        {
+            let _ = tx;
+            Err(anyhow!("RawInputSource is only supported on Windows"))
+        }
     }
 
     fn stop(&mut self) -> Result<()> {
-        if let Some(SendHwnd(hwnd)) = self.window_handle.take() {
-            self.is_running.store(false, Ordering::SeqCst);
-            unsafe {
-                let _ = PostMessageW(hwnd, WM_USER + 1, WPARAM(0), LPARAM(0));
+        #[cfg(windows)]
+        {
+            if let Some(SendHwnd(hwnd)) = self.window_handle.take() {
+                self.is_running.store(false, Ordering::SeqCst);
+                unsafe {
+                    let _ = PostMessageW(hwnd, WM_USER + 1, WPARAM(0), LPARAM(0));
+                }
             }
         }
 
@@ -93,6 +122,13 @@ impl InputSource for RawInputSource {
     }
 }
 
+impl Drop for RawInputSource {
+    fn drop(&mut self) {
+        let _ = self.stop();
+    }
+}
+
+#[cfg(windows)]
 unsafe extern "system" fn raw_input_wnd_proc(
     hwnd: HWND,
     msg: u32,
@@ -102,10 +138,13 @@ unsafe extern "system" fn raw_input_wnd_proc(
     DefWindowProcW(hwnd, msg, wparam, lparam)
 }
 
+#[cfg(windows)]
 fn run_message_loop(
     tx: Sender<InputEvent>,
     hwnd_tx: std::sync::mpsc::Sender<SendHwnd>,
     is_running: Arc<AtomicBool>,
+    listen_mouse: bool,
+    listen_keyboard: bool,
 ) -> Result<()> {
     unsafe {
         let instance = GetModuleHandleW(None)?;
@@ -120,7 +159,10 @@ fn run_message_loop(
 
         let atom = RegisterClassW(&wnd_class);
         if atom == 0 {
-            return Err(anyhow!("Failed to register window class"));
+            let err = windows::Win32::Foundation::GetLastError();
+            if err != windows::Win32::Foundation::ERROR_CLASS_ALREADY_EXISTS {
+                return Err(anyhow!("Failed to register window class: {:?}", err));
+            }
         }
 
         let hwnd = CreateWindowExW(
@@ -140,23 +182,31 @@ fn run_message_loop(
 
         let _ = hwnd_tx.send(SendHwnd(hwnd));
 
-        let mouse_device = RAWINPUTDEVICE {
-            usUsagePage: 0x01, // Generic Desktop Controls
-            usUsage: 0x02,     // Mouse
-            dwFlags: RIDEV_INPUTSINK,
-            hwndTarget: hwnd,
-        };
-        
-        let kb_device = RAWINPUTDEVICE {
-            usUsagePage: 0x01, // Generic Desktop Controls
-            usUsage: 0x06,     // Keyboard
-            dwFlags: RIDEV_INPUTSINK,
-            hwndTarget: hwnd,
-        };
+        let mut devices = Vec::new();
 
-        if let Err(e) = RegisterRawInputDevices(&[mouse_device, kb_device], size_of::<RAWINPUTDEVICE>() as u32) {
-            let _ = DestroyWindow(hwnd);
-            return Err(anyhow!("Failed to register raw input devices: {}", e));
+        if listen_mouse {
+            devices.push(RAWINPUTDEVICE {
+                usUsagePage: 0x01, // Generic Desktop Controls
+                usUsage: 0x02,     // Mouse
+                dwFlags: RIDEV_INPUTSINK,
+                hwndTarget: hwnd,
+            });
+        }
+        
+        if listen_keyboard {
+            devices.push(RAWINPUTDEVICE {
+                usUsagePage: 0x01, // Generic Desktop Controls
+                usUsage: 0x06,     // Keyboard
+                dwFlags: RIDEV_INPUTSINK,
+                hwndTarget: hwnd,
+            });
+        }
+
+        if !devices.is_empty() {
+            if let Err(e) = RegisterRawInputDevices(&devices, size_of::<RAWINPUTDEVICE>() as u32) {
+                let _ = DestroyWindow(hwnd);
+                return Err(anyhow!("Failed to register raw input devices: {}", e));
+            }
         }
 
         let mut msg = MSG::default();
@@ -176,19 +226,26 @@ fn run_message_loop(
         }
 
         // Cleanup
-        let remove_mouse = RAWINPUTDEVICE {
-            usUsagePage: 0x01,
-            usUsage: 0x02,
-            dwFlags: RIDEV_REMOVE,
-            hwndTarget: HWND::default(),
-        };
-        let remove_kb = RAWINPUTDEVICE {
-            usUsagePage: 0x01,
-            usUsage: 0x06,
-            dwFlags: RIDEV_REMOVE,
-            hwndTarget: HWND::default(),
-        };
-        let _ = RegisterRawInputDevices(&[remove_mouse, remove_kb], size_of::<RAWINPUTDEVICE>() as u32);
+        let mut remove_devices = Vec::new();
+        if listen_mouse {
+            remove_devices.push(RAWINPUTDEVICE {
+                usUsagePage: 0x01,
+                usUsage: 0x02,
+                dwFlags: RIDEV_REMOVE,
+                hwndTarget: HWND::default(),
+            });
+        }
+        if listen_keyboard {
+            remove_devices.push(RAWINPUTDEVICE {
+                usUsagePage: 0x01,
+                usUsage: 0x06,
+                dwFlags: RIDEV_REMOVE,
+                hwndTarget: HWND::default(),
+            });
+        }
+        if !remove_devices.is_empty() {
+            let _ = RegisterRawInputDevices(&remove_devices, size_of::<RAWINPUTDEVICE>() as u32);
+        }
 
         let _ = DestroyWindow(hwnd);
     }
@@ -196,6 +253,7 @@ fn run_message_loop(
     Ok(())
 }
 
+#[cfg(windows)]
 fn process_raw_input(lparam: LPARAM, tx: &Sender<InputEvent>) {
     unsafe {
         let mut data_size: u32 = 0;

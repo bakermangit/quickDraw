@@ -18,7 +18,6 @@ QuickDraw is a system-wide mouse gesture recognition engine for Windows. The use
 
 ## Non-Goals (for now)
 
-- **Overlay rendering**: No on-screen gesture trail visualization. May be added later.
 - **Cross-platform**: Windows only. Linux/macOS support is out of scope.
 - **Complex UI**: The config frontend is a separate concern, accessed on-demand. The core daemon is headless.
 
@@ -48,14 +47,18 @@ The application is split into two concerns:
 
 JSON is used for IPC messages between daemon and frontend.
 
-### Input Method (v1): Raw Input
+### Input Methods & Decoupling
 
-- Works in exclusive fullscreen (most compatible with games)
-- `RIDEV_INPUTSINK` flag allows background reception without interfering with the game
-- Multiple applications can listen to Raw Input simultaneously — no conflict with games that also use it
-- Standard Windows API — less likely to trigger anti-cheat than hooks
-- **Read-only**: Raw Input can observe mouse events but **cannot block or intercept** them. Mouse movement during a gesture will still reach the game. This is mitigated by the cursor reset feature (see below).
-- Future modules: low-level hooks (can block input), polling (also read-only)
+QuickDraw supports decoupled input sources, allowing users to select separate backends for mouse and keyboard capturing simultaneously.
+
+1. **Raw Input**:
+   - Works in exclusive fullscreen (most compatible with games)
+   - `RIDEV_INPUTSINK` allows background reception
+   - Read-only: cannot block or intercept input. Mouse movement during a gesture still reaches the game. Mitigated by cursor reset.
+2. **Low-Level Hook (`WH_MOUSE_LL`)**:
+   - Capable of intercepting and swallowing mouse events so they don't reach the underlying application.
+   - Recommended for desktop productivity use cases. May be flagged by aggressive game anti-cheats.
+3. **Polling** (Future): Read-only fallback.
 
 ### Gesture Recognition (v1): $1 Recognizer
 
@@ -101,6 +104,7 @@ Implemented via `SetCursorPos` Win32 API. The original cursor position is record
 Optional audio cues for gesture results:
 - **Global sounds**: `success.wav` plays on a successful gesture match, `error.wav` plays on a failed match
 - **Per-gesture sounds**: Individual gestures can override the global success sound with a custom audio file
+- **Volume Control**: A global volume setting applies to all audio playback. To ensure consistent volume control across different formats, the engine uses the Windows MCI (Media Control Interface) API with `type mpegvideo` aliases.
 - Sounds are configurable and can be disabled entirely
 
 This helps the user know immediately whether their gesture was recognized, especially important when there's no visual overlay.
@@ -109,6 +113,7 @@ Config example:
 ```toml
 [audio]
 enabled = true
+volume = 0.5                      # global volume (0.0 to 1.0)
 success = "sounds/success.wav"    # global default
 error = "sounds/error.wav"         # global default
 
@@ -117,6 +122,21 @@ name = "flick-right"
 action = { type = "key_press", key = "F1" }
 sound = "sounds/flick.wav"         # overrides global success sound
 ```
+
+### Visual Feedback (Trace Overlay)
+
+QuickDraw features an optional native Win32 GDI trace overlay that provides real-time visual feedback of the gesture path.
+- **Zero Overhead**: When disabled in config, the overlay thread and window are entirely bypassed.
+- **Trace Finesse**: The stroke width can dynamically grow from a minimum to a maximum size to visualize gesture origin and velocity/direction.
+- **Click-Through**: Uses `WS_EX_TRANSPARENT` and `WS_EX_LAYERED` to ensure the overlay never steals focus or intercepts clicks.
+
+### Hot-Reloading and Lifecycle Management
+
+To avoid "ghost" tray icons and resource leaks associated with process restarts, QuickDraw uses a native hot-reloading mechanism:
+- **RAII-based Cleanup**: Input sources (`HookInputSource`, `RawInputSource`) implement the `Drop` trait. When the engine pipeline is dropped, OS-level hooks are automatically uninstalled and background threads joined.
+- **Pipeline Rebuild**: The core event loop in `main.rs` can drop the current pipeline future and rebuild it from scratch using fresh configuration from disk. This happens instantly without the process exiting.
+- **Unified Signaling**: A global `SystemCommand` channel allows the Tray Icon and Web UI to trigger application-level actions (Reload, Quit, Open Config) through a single consistent interface.
+- **Auto-Reload**: Saving settings in the Web UI automatically triggers a background engine reload.
 
 ### Gesture Creation
 
@@ -130,13 +150,12 @@ Gestures are recorded through the frontend:
 
 **Raw data is always preserved** alongside the processed representation. This allows re-processing existing gestures when switching algorithms or adding features like velocity filtering.
 
-### Velocity Support
+### Velocity and Length Constraints
 
-For v1, velocity is not part of gesture matching. However:
-- Raw captures include timestamps, so velocity data is always available
-- A simple velocity filter can be layered on top of $1: check total gesture duration against a threshold
-- More sophisticated per-segment velocity profiles are a future enhancement
-- The modular architecture supports composing recognizers with filters without modifying either
+While shape recognition algorithms (like $1) are scale and speed invariant, QuickDraw allows users to enforce minimum and maximum bounds on a gesture's physical path length and drawing speed (pixels per millisecond).
+- These constraints are evaluated *after* shape matching.
+- Allows differentiating between a "fast, large circle" and a "slow, small circle" even if the shape template is identical.
+- Smart auto-calculation in the frontend pre-fills a ±30% tolerance buffer when recording new gestures.
 
 ## Programming Paradigm
 

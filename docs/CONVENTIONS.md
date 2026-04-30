@@ -174,6 +174,16 @@ warn!("No matching gesture found for capture ({} points)", capture.points.len())
 | `tungstenite` or `tokio-tungstenite` | WebSocket server |
 | `axum` | HTTP server (serves config UI static files) |
 
+## Documentation & Doctests
+
+Use standard `///` docstrings for all `pub` items. However, to optimize our LLM context windows and developer experience, follow the **Hybrid Approach** for doctests:
+
+- **Standard Methods/Structs**: Keep them lean. Provide a single-sentence `///` description. Do not write full doctests (````rust `) for simple getters, setters, or configuration structs.
+- **The IPC Boundary (`src/types.rs`)**: This is our contract between the Rust daemon and the Frontend UI. Shared types like `GestureMatch` and `ActionRequest` MUST have doctests showing exactly what their serialized JSON payload looks like.
+- **Core Architectural Traits & Utilities**: (e.g. `GestureRecognizer`, `InputSource`). Use inline doctests to provide a clear "Happy Path" example. This helps consumer agents instantly understand how to build a new implementation.
+- **The Plumbing (`src/pipeline.rs`)**: Leave internal state machines and accumulators alone. No doctests are needed here; rely on the `#[cfg(test)]` unit tests to verify logic without bloating the context window.
+- **Massive Documentation Blocks**: If a module or trait requires extensive examples or 50+ lines of documentation, do not bloat the `.rs` file. Put the documentation in a `docs/components/*.md` file and link it natively using `#[doc = include_str!("../docs/components/file.md")]`.
+
 ## Testing
 
 - Unit tests for pure logic (gesture recognition, config parsing, trigger state machine)

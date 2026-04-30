@@ -1,6 +1,7 @@
 use std::path::PathBuf;
-use windows::Win32::Media::Audio::{PlaySoundW, SND_FILENAME, SND_ASYNC};
+#[cfg(windows)]
 use windows::Win32::Media::Multimedia::mciSendStringW;
+#[cfg(windows)]
 use windows::core::HSTRING;
 use crate::config::{AudioConfig, get_config_dir};
 
@@ -45,38 +46,48 @@ impl AudioPlayer {
             return;
         }
 
-        let extension = absolute_path.extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-
-        if extension == "wav" {
-            let wide = HSTRING::from(absolute_path.as_os_str());
-            unsafe {
-                let _ = PlaySoundW(&wide, None, SND_FILENAME | SND_ASYNC);
-            }
-        } else {
-            // Use MCI for MP3 and other formats
-            self.play_mci(&absolute_path);
-        }
+        // Use MCI for all playback to support volume control consistently
+        self.play_mci(&absolute_path);
     }
 
-    fn play_mci(&self, path: &std::path::Path) {
-        let path_str = path.to_string_lossy();
-        // MCI commands need to handle spaces in paths. Quoting the path is the standard way.
-        // We use aliases to manage the sound. 
-        // For simple fire-and-forget, we close the alias before opening it again.
-        let open_cmd = HSTRING::from(format!("open \"{}\" alias qdsound", path_str));
-        let play_cmd = HSTRING::from("play qdsound from 0");
-        let close_cmd = HSTRING::from("close qdsound");
+    fn play_mci(&self, _path: &std::path::Path) {
+        #[cfg(windows)]
+        {
+            let path_str = _path.to_string_lossy();
+            // MCI volume is 0-1000. Note: some drivers might use 0-100 but mpegvideo is 0-1000.
+            let volume = (self.config.volume * 1000.0).clamp(0.0, 1000.0) as u32;
 
-        unsafe {
-            // Close any previous instance first
-            let _ = mciSendStringW(&close_cmd, None, None);
-            if mciSendStringW(&open_cmd, None, None) == 0 {
-                let _ = mciSendStringW(&play_cmd, None, None);
-            } else {
-                tracing::error!("MCI failed to open audio file: {}", path_str);
+            // Use 'mpegvideo' type (DirectShow) as it provides better volume control.
+            // We try to open it with 'type mpegvideo'. If that fails, we let MCI decide.
+            let open_cmd_forced = HSTRING::from(format!("open \"{}\" type mpegvideo alias qdsound", path_str));
+            let open_cmd_auto = HSTRING::from(format!("open \"{}\" alias qdsound", path_str));
+            let volume_cmd = HSTRING::from(format!("setaudio qdsound volume to {}", volume));
+            let volume_cmd_alt = HSTRING::from(format!("set qdsound audio volume to {}", volume));
+            let play_cmd = HSTRING::from("play qdsound from 0");
+            let close_cmd = HSTRING::from("close qdsound");
+
+            unsafe {
+                // Close any previous instance first to free the alias
+                let _ = mciSendStringW(&close_cmd, None, None);
+
+                let mut res = mciSendStringW(&open_cmd_forced, None, None);
+                if res != 0 {
+                    // Fallback to auto-type if forced mpegvideo fails
+                    res = mciSendStringW(&open_cmd_auto, None, None);
+                }
+
+                if res == 0 {
+                    // Try multiple MCI volume command variants to maximize compatibility across drivers
+                    let _ = mciSendStringW(&volume_cmd, None, None);
+                    let _ = mciSendStringW(&volume_cmd_alt, None, None);
+
+                    let play_res = mciSendStringW(&play_cmd, None, None);
+                    if play_res != 0 {
+                        tracing::error!("MCI failed to play audio file (error {}): {}", play_res, path_str);
+                    }
+                } else {
+                    tracing::error!("MCI failed to open audio file (error {}): {}", res, path_str);
+                }
             }
         }
     }

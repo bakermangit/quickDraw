@@ -17,11 +17,18 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             general: GeneralConfig {
-                input_method: "raw_input".to_string(),
+                mouse_input_method: "raw_input".to_string(),
+                keyboard_input_method: "raw_input".to_string(),
                 recognizer: "dollar_one".to_string(),
                 confidence_threshold: 0.80,
                 gesture_profile: "default".to_string(),
                 cursor_reset: true,
+                trace_overlay_enabled: true,
+                trace_color: "#BE5103".to_string(),
+                trace_finesse_enabled: false,
+                trace_min_stroke: 1,
+                trace_max_stroke: 10,
+                trace_growth_rate: 0.2,
             },
             trigger: TriggerConfig::Combo {
                 key1: "Mouse1".to_string(),
@@ -29,6 +36,7 @@ impl Default for Config {
             },
             audio: AudioConfig {
                 enabled: true,
+                volume: 1.0,
                 success: "sounds/success.wav".to_string(),
                 error: "sounds/error.wav".to_string(),
             },
@@ -44,11 +52,18 @@ impl Default for Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeneralConfig {
-    pub input_method: String,
+    pub mouse_input_method: String,
+    pub keyboard_input_method: String,
     pub recognizer: String,
     pub confidence_threshold: f64,
     pub gesture_profile: String,
     pub cursor_reset: bool,
+    pub trace_overlay_enabled: bool,
+    pub trace_color: String,
+    pub trace_finesse_enabled: bool,
+    pub trace_min_stroke: i32,
+    pub trace_max_stroke: i32,
+    pub trace_growth_rate: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +86,7 @@ pub enum TriggerConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioConfig {
     pub enabled: bool,
+    pub volume: f64,
     pub success: String,
     pub error: String,
 }
@@ -98,6 +114,10 @@ pub struct GestureConfig {
     pub pattern: GesturePatternConfig,
     pub raw: GestureCapture,
     pub confidence_threshold: Option<f64>,
+    pub min_speed_px_per_ms: Option<f64>,
+    pub max_speed_px_per_ms: Option<f64>,
+    pub min_path_length_px: Option<f64>,
+    pub max_path_length_px: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

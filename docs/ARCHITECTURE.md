@@ -5,13 +5,16 @@
 QuickDraw is structured as a pipeline of three modular stages connected by channels:
 
 ```
-┌──────────────┐     Channel      ┌─────────────────┐     Channel      ┌───────────────┐
-│ Input Source  │────────────────►│  Gesture Engine  │────────────────►│ Output Action  │
-│              │  InputEvent      │                 │   ActionRequest  │               │
-│ (Raw Input)  │                  │ ($1 Recognizer) │                  │ (Keyboard Sim)│
-│ (Hooks)      │                  │ (Rubine)        │                  │ (Mouse Click) │
-│ (Polling)    │                  │ (+ Filters)     │                  │ (Code Exec)   │
-└──────────────┘                  └─────────────────┘                  └───────────────┘
+┌──────────────┐
+│ Input Sources │
+│  (Mouse)     │──────┐
+│  (Keyboard)  │      │ Channel      ┌─────────────────┐     Channel      ┌───────────────┐
+└──────────────┘      └─────────────►│  Gesture Engine  │────────────────►│ Output Action  │
+                      InputEvent     │                 │   ActionRequest  │               │
+                                     │ ($1 Recognizer) │                  │ (Keyboard Sim)│
+                                     │ (Rubine)        │                  │ (Mouse Click) │
+                                     │ (+ Filters)     │                  │ (Code Exec)   │
+                                     └─────────────────┘                  └───────────────┘
         ▲                                                                      │
         │                        ┌─────────────────┐                           │
         │                        │   Config Store   │                           │
@@ -34,8 +37,8 @@ QuickDraw is structured as a pipeline of three modular stages connected by chann
 ### Data Flow
 
 ```
-1. InputSource produces InputEvents (mouse move, button press/release)
-2. TriggerDetector consumes InputEvents, manages trigger state
+1. Decoupled InputSources (Mouse & Keyboard) concurrently produce InputEvents (mouse move, button press/release).
+2. Both feed a single MPSC channel. TriggerDetector consumes InputEvents, manages trigger state.
    - When trigger activates: begins accumulating mouse positions into a GestureCapture
    - When trigger deactivates: sends completed GestureCapture to GestureEngine
 3. GestureEngine receives GestureCapture, runs recognition
@@ -380,11 +383,11 @@ src/
 
 ```
 OS thread: Tray icon (Win32 message loop)
-  └── blocking_send(TrayCommand) ──────────────────────────────────┐
-                                                                    │
+  └── blocking_send(SystemCommand) ───────────────────────────────┐
+                                                                     │
 OS thread: Raw Input (Win32 GetMessageW loop)                       │
   └── blocking_send(InputEvent) ──────────────────────────────────┐ │
-                                                                   │ │
+                                                                    │ │
 Tokio runtime (main thread):                                       │ │
   ├── Pipeline task (async)  ◄────────────────────────────────────┘ │
   │    ├── tokio::select! on InputEvent channel + CaptureRequest     │
@@ -397,10 +400,12 @@ Tokio runtime (main thread):                                       │ │
   │    ├── Serves assets/index.html on GET /                         │
   │    ├── WebSocket IPC on GET /ws                                  │
   │    └── Shared state: Arc<tokio::sync::Mutex<ServerState>>        │
-  │         (config + gesture_profile — only place Mutex is used)    │
+  │         (config + profile + capture_tx + cmd_tx)                 │
   │                                                                  │
   └── tokio::select! on pipeline.run() + cmd_rx ◄───────────────────┘
-       (TrayCommand::Quit → exit, OpenConfig → spawn browser)
+       (SystemCommand::Quit → exit)
+       (SystemCommand::OpenConfig → spawn browser)
+       (SystemCommand::ReloadEngine → rebuild pipeline)
 ```
 
-Inter-component communication is via `tokio::sync::mpsc` channels. The one exception is `ServerState` which uses `Arc<tokio::sync::Mutex<>>` — necessary because the WebSocket server must share config/profile data across concurrent WebSocket connections.
+Inter-component communication is via `tokio::sync::mpsc` channels. `ServerState` uses `Arc<tokio::sync::Mutex<>>` to share configuration and command channels across WebSocket connections. The engine uses RAII (`Drop` traits) to ensure OS-level resources (hooks, windows) are cleaned up whenever the pipeline is reloaded or the app exits.

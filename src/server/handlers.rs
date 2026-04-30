@@ -6,6 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::config::{Config, GestureConfig};
 use crate::pipeline::CaptureRequest;
+use crate::types::SystemCommand;
 use super::SharedState;
 
 #[derive(Deserialize)]
@@ -14,13 +15,24 @@ enum ClientMessage {
     GetConfig,
     ListGestures,
     SaveGesture { gesture: GestureConfig },
-    UpdateGesture { name: String, action: crate::config::ActionConfig, confidence_threshold: Option<f64> },
+    UpdateGesture {
+        old_name: String,
+        new_name: String,
+        action: crate::config::ActionConfig,
+        sound: Option<String>,
+        confidence_threshold: Option<f64>,
+        min_speed_px_per_ms: Option<f64>,
+        max_speed_px_per_ms: Option<f64>,
+        min_path_length_px: Option<f64>,
+        max_path_length_px: Option<f64>,
+    },
     DeleteGesture { name: String },
     DeleteTemplate { index: usize },
     SetConfig { config: Config },
     StartCapture,
     CancelCapture,
     Reload,
+    ReloadEngine,
 }
 
 #[derive(Serialize)]
@@ -37,7 +49,6 @@ enum ServerMessage {
 pub async fn handle_socket(
     socket: WebSocket,
     state: SharedState,
-    capture_tx: mpsc::Sender<CaptureRequest>,
 ) {
     let (mut sender, mut receiver) = socket.split();
     let (tx, mut rx) = mpsc::channel::<ServerMessage>(32);
@@ -93,14 +104,30 @@ pub async fn handle_socket(
                                 let _ = tx.send(ServerMessage::Error { message: "Invalid template index".to_string() }).await;
                             }
                         }
-                        ClientMessage::UpdateGesture { name, action, confidence_threshold } => {
+                        ClientMessage::UpdateGesture {
+                            old_name,
+                            new_name,
+                            action,
+                            sound,
+                            confidence_threshold,
+                            min_speed_px_per_ms,
+                            max_speed_px_per_ms,
+                            min_path_length_px,
+                            max_path_length_px,
+                        } => {
                             let mut state_guard = state.lock().await;
                             let profile_name = state_guard.config.general.gesture_profile.clone();
 
                             for g in &mut state_guard.gesture_profile.gestures {
-                                if g.name == name {
+                                if g.name == old_name {
+                                    g.name = new_name.clone();
                                     g.action = action.clone();
+                                    g.sound = sound.clone();
                                     g.confidence_threshold = confidence_threshold;
+                                    g.min_speed_px_per_ms = min_speed_px_per_ms;
+                                    g.max_speed_px_per_ms = max_speed_px_per_ms;
+                                    g.min_path_length_px = min_path_length_px;
+                                    g.max_path_length_px = max_path_length_px;
                                 }
                             }
                             
@@ -132,6 +159,7 @@ pub async fn handle_socket(
                                 if let Err(e) = std::fs::write(&config_path, toml_str) {
                                     let _ = tx.send(ServerMessage::Error { message: e.to_string() }).await;
                                 } else {
+                                    let _ = state_guard.cmd_tx.send(SystemCommand::ReloadEngine).await;
                                     let _ = tx.send(ServerMessage::Ok).await;
                                 }
                             } else {
@@ -147,6 +175,7 @@ pub async fn handle_socket(
                             let (res_tx, res_rx) = oneshot::channel();
                             let (cancel_tx, cancel_rx) = oneshot::channel();
 
+                            let capture_tx = state.lock().await.capture_tx.clone();
                             if capture_tx.send(CaptureRequest { result_tx: res_tx, cancel_rx }).await.is_ok() {
                                 let tx_clone = tx.clone();
                                 let (abort_tx, mut abort_rx) = oneshot::channel::<()>();
@@ -209,6 +238,11 @@ pub async fn handle_socket(
                                     let _ = tx.send(ServerMessage::Error { message: e.to_string() }).await;
                                 }
                             }
+                        }
+                        ClientMessage::ReloadEngine => {
+                            let state_guard = state.lock().await;
+                            let _ = state_guard.cmd_tx.send(SystemCommand::ReloadEngine).await;
+                            let _ = tx.send(ServerMessage::Ok).await;
                         }
                     }
                 }

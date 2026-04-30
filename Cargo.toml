@@ -7,6 +7,10 @@ edition = "2021"
 name = "quickdraw"
 path = "src/main.rs"
 
+[lib]
+name = "quickdraw"
+path = "src/lib.rs"
+
 [dependencies]
 # Win32 API bindings (Raw Input, SendInput, tray integration)
 windows = { version = "0.58", features = [
@@ -16,6 +20,7 @@ windows = { version = "0.58", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Gdi",
     "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
     "Win32_UI_Shell",
     "Win32_Media",
     "Win32_Media_Audio",
