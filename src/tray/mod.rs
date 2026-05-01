@@ -1,12 +1,12 @@
 use anyhow::Result;
 use tray_icon::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
+    menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
     TrayIconBuilder, Icon,
 };
 use tokio::sync::mpsc;
 use crate::types::SystemCommand;
 
-pub fn start_tray(_cmd_tx: mpsc::Sender<SystemCommand>) -> Result<()> {
+pub fn start_tray(cmd_tx: mpsc::Sender<SystemCommand>) -> Result<()> {
     let icon = create_placeholder_icon();
 
     let configure_item = MenuItem::new("Configure...", true, None);
