@@ -159,7 +159,9 @@ pub async fn handle_socket(
                                 if let Err(e) = std::fs::write(&config_path, toml_str) {
                                     let _ = tx.send(ServerMessage::Error { message: e.to_string() }).await;
                                 } else {
-                                    let _ = state_guard.cmd_tx.send(SystemCommand::ReloadEngine).await;
+                                    let cmd_tx = state_guard.cmd_tx.clone();
+                                    drop(state_guard);
+                                    let _ = cmd_tx.send(SystemCommand::ReloadEngine).await;
                                     let _ = tx.send(ServerMessage::Ok).await;
                                 }
                             } else {
@@ -240,8 +242,11 @@ pub async fn handle_socket(
                             }
                         }
                         ClientMessage::ReloadEngine => {
-                            let state_guard = state.lock().await;
-                            let _ = state_guard.cmd_tx.send(SystemCommand::ReloadEngine).await;
+                            let cmd_tx = {
+                                let state_guard = state.lock().await;
+                                state_guard.cmd_tx.clone()
+                            };
+                            let _ = cmd_tx.send(SystemCommand::ReloadEngine).await;
                             let _ = tx.send(ServerMessage::Ok).await;
                         }
                     }

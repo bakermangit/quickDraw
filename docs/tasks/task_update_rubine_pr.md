@@ -19,6 +19,7 @@
 - Resolved conflicts in `src/pipeline.rs` and `src/types.rs`.
 - Ran `cargo test` to verify logic and doctests.
 - Updated `docs/REPO_MAP.md` using the generator tool.
+- Refined `RubineRecognizer` and pipeline logic based on automated code review feedback (timestamp safety, keyboard backend restrictions, mutex optimizations).
 
 ## Setup Instructions
 

@@ -58,7 +58,7 @@ impl RubineRecognizer {
 
     pub fn extract_features(capture: &GestureCapture) -> [f64; 13] {
         let n = capture.points.len();
-        if n < 3 {
+        if n < 3 || capture.timestamps.len() < n {
             return [0.0; 13];
         }
 
@@ -118,7 +118,7 @@ impl RubineRecognizer {
             let dist = dist_sq.sqrt();
             f7 += dist;
 
-            let dt = (t[i] - t[i - 1]) as f64;
+            let dt = t[i].saturating_sub(t[i - 1]) as f64;
             if dt > 0.0 {
                 let speed_sq = dist_sq / (dt * dt);
                 if speed_sq > f11 {

@@ -230,7 +230,12 @@ fn compute_path_length(capture: &GestureCapture) -> f64 {
 
 fn compute_speed(capture: &GestureCapture) -> f64 {
     let length = compute_path_length(capture);
-    let duration = capture.timestamps.last().copied().unwrap_or(0);
+    if capture.timestamps.len() < 2 {
+        return 0.0;
+    }
+    let first = capture.timestamps[0];
+    let last = *capture.timestamps.last().unwrap();
+    let duration = last.saturating_sub(first);
     if duration == 0 {
         0.0
     } else {
@@ -261,7 +266,7 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
 
     let keyboard_input_source: Box<dyn InputSource> = match config.general.keyboard_input_method.as_str() {
         "raw_input" => Box::new(RawInputSource::new(false, true)),
-        "hook" => Box::new(HookInputSource::new()),
+        "hook" => return Err(anyhow!("The 'hook' backend only supports mouse input. Please use 'raw_input' for keyboard.")),
         other => return Err(anyhow!("Unknown keyboard input method: {}", other)),
     };
 

@@ -89,7 +89,7 @@ impl InputSource for HookInputSource {
                         Some(low_level_mouse_proc),
                         h_instance,
                         0,
-                    ).expect("Failed to install mouse hook");
+                    ).map_err(|e| anyhow!("Failed to install mouse hook: {}", e))?;
 
                     let mut msg = MSG::default();
                     while GetMessageW(&mut msg, HWND::default(), 0, 0).into() {
