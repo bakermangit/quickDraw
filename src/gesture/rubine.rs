@@ -1,3 +1,5 @@
+use std::f64::consts::PI;
+
 use crate::types::{GestureCapture, GestureMatch, GestureTemplate};
 use super::GestureRecognizer;
 
@@ -128,8 +130,8 @@ impl RubineRecognizer {
             if i > 1 {
                 let mut delta = angle - prev_angle;
                 // Normalize delta to [-PI, PI]
-                while delta > std::f64::consts::PI { delta -= 2.0 * std::f64::consts::PI; }
-                while delta < -std::f64::consts::PI { delta += 2.0 * std::f64::consts::PI; }
+                while delta > PI { delta -= 2.0 * PI; }
+                while delta < -PI { delta += 2.0 * PI; }
 
                 f8 += delta;
                 f9 += delta.abs();

@@ -1,18 +1,11 @@
 use quickdraw::config;
 use quickdraw::pipeline;
-use quickdraw::types;
-use quickdraw::input;
-use quickdraw::gesture;
-use quickdraw::output;
-use quickdraw::audio;
+use quickdraw::types::SystemCommand;
+use quickdraw::server::{self, ServerState};
 use quickdraw::tray;
-use quickdraw::server;
-use quickdraw::ui;
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use server::ServerState;
-use crate::types::SystemCommand;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

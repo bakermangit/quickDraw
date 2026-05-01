@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use std::mem::size_of;
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,

@@ -1,9 +1,7 @@
 use anyhow::{anyhow, Result};
-use std::ffi::c_void;
-use std::mem::size_of;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::thread::{self, JoinHandle};
+use std::thread::JoinHandle;
 use tokio::sync::mpsc::Sender;
 #[cfg(windows)]
 use windows::core::w;
@@ -23,7 +21,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_USER, WNDCLASSW,
 };
 
-use crate::types::{InputEvent, InputEventType, MouseButton, VirtualKey};
+use crate::types::InputEvent;
 use super::InputSource;
 
 // HWND is not Send, but we only use it to send a quit message across threads.
