@@ -1,5 +1,4 @@
 use std::sync::mpsc;
-use std::thread;
 #[cfg(windows)]
 use windows::{
     core::*,

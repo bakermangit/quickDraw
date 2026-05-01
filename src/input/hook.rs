@@ -2,7 +2,7 @@
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 #[cfg(windows)]
 use std::sync::Mutex;
-use std::thread::{self, JoinHandle};
+use std::thread::JoinHandle;
 use anyhow::{anyhow, Result};
 use tokio::sync::mpsc;
 #[cfg(windows)]
@@ -19,7 +19,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_MBUTTONDOWN, WM_MBUTTONUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
 };
 
-use crate::types::{InputEvent, InputEventType, MouseButton};
+use crate::types::InputEvent;
 use super::InputSource;
 
 #[cfg(windows)]
