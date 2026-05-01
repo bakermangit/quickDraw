@@ -20,6 +20,7 @@
 - Ran `cargo test` to verify logic and doctests.
 - Updated `docs/REPO_MAP.md` using the generator tool.
 - Refined `RubineRecognizer` and pipeline logic based on automated code review feedback (timestamp safety, keyboard backend restrictions, mutex optimizations).
+- Applied surgical fixes to ensure cross-platform compilation and correct runtime behavior in `pipeline.rs`, `rubine.rs`, and `handlers.rs`.
 
 ## Setup Instructions
 

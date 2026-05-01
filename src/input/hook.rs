@@ -76,20 +76,34 @@ impl InputSource for HookInputSource {
             let handle = thread::spawn(move || {
                 unsafe {
                     let thread_id = GetCurrentThreadId();
-                    let _ = id_tx.send(thread_id);
 
                     let mut pos = windows::Win32::Foundation::POINT::default();
                     let _ = GetCursorPos(&mut pos);
                     LAST_X.store(pos.x, Ordering::Relaxed);
                     LAST_Y.store(pos.y, Ordering::Relaxed);
 
-                    let h_instance = GetModuleHandleW(None).unwrap();
-                    let hook = SetWindowsHookExW(
+                    let h_instance = match GetModuleHandleW(None) {
+                        Ok(h) => h,
+                        Err(e) => {
+                            let _ = id_tx.send(Err(anyhow!("Failed to get module handle: {}", e)));
+                            return;
+                        }
+                    };
+
+                    let hook = match SetWindowsHookExW(
                         WH_MOUSE_LL,
                         Some(low_level_mouse_proc),
                         h_instance,
                         0,
-                    ).map_err(|e| anyhow!("Failed to install mouse hook: {}", e))?;
+                    ) {
+                        Ok(h) => h,
+                        Err(e) => {
+                            let _ = id_tx.send(Err(anyhow!("Failed to install mouse hook: {}", e)));
+                            return;
+                        }
+                    };
+
+                    let _ = id_tx.send(Ok(thread_id));
 
                     let mut msg = MSG::default();
                     while GetMessageW(&mut msg, HWND::default(), 0, 0).into() {
@@ -103,7 +117,8 @@ impl InputSource for HookInputSource {
             });
 
             self.thread_handle = Some(handle);
-            self.thread_id = Some(id_rx.recv().map_err(|e| anyhow!("Failed to receive thread ID: {}", e))?);
+            let thread_id = id_rx.recv().map_err(|e| anyhow!("Failed to receive thread ID: {}", e))??;
+            self.thread_id = Some(thread_id);
 
             Ok(())
         }
