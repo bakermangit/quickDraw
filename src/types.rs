@@ -74,9 +74,12 @@ pub struct GestureTemplate {
     /// a profile.
     pub name: String,
     /// Pre-processed template points produced by the recogniser's normalise
-    /// step (resampled, scaled, rotated).  Stored so the daemon can skip
-    /// re-processing on every startup.
+    /// step (resampled, scaled, rotated). For Rubine, this holds the raw points
+    /// from the capture. Stored so the daemon can skip re-processing on every startup.
     pub template_points: Vec<(f64, f64)>,
+    /// Statistical feature vector for recognizers that use it (e.g. Rubine).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub features: Option<Vec<f64>>,
     /// The algorithm that produced (and should match against) these points,
     /// e.g. `"dollar_one"`.
     pub algorithm: String,

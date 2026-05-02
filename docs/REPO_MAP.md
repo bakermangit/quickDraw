@@ -24,7 +24,7 @@ pub struct GestureConfig { pub name : String , pub action : ActionConfig , pub s
 
 pub enum ActionConfig { KeyPress { key : VirtualKey , # [serde (default)] modifiers : Vec < VirtualKey > , } , }
 
-pub struct GesturePatternConfig { pub algorithm : String , pub template_points : Vec < [f64 ; 2] > , }
+pub struct GesturePatternConfig { pub algorithm : String , pub template_points : Vec < [f64 ; 2] > , # [serde (skip_serializing_if = "Option::is_none")] pub features : Option < Vec < f64 > > , }
 
 pub fn get_config_dir () -> Result < PathBuf >;
 
@@ -47,6 +47,32 @@ pub struct DollarOneRecognizer { }
 pub trait GestureRecognizer : Send + 'static { # [doc = " Attempt to recognize a gesture from captured mouse data."] # [doc = " Returns the best match above the confidence threshold, or None."] fn recognize (& self , capture : & GestureCapture , templates : & [GestureTemplate] ,) -> Option < GestureMatch > ; # [doc = " Process a raw capture into a template for storage."] # [doc = " Called during gesture recording to generate the processed form."] fn create_template (& self , name : String , capture : & GestureCapture) -> GestureTemplate ; # [doc = " Human-readable name (e.g., \"dollar_one\", \"rubine\")"] # [allow (dead_code)] fn name (& self) -> & str ; }
 
 pub trait GestureFilter : Send + 'static { # [doc = " Post-recognition filter. Returns true if the gesture should be accepted."] fn accept (& self , capture : & GestureCapture , template : & GestureTemplate) -> bool ; # [doc = " Human-readable name"] fn name (& self) -> & str ; }
+```
+
+### src/gesture/rubine.rs
+```rust
+/// Rubine Gesture Recognizer implementation.
+///
+/// This recognizer extracts 13 dynamic features from a gesture and compares them
+/// to templates using a normalized Euclidean distance.
+///
+/// # Example
+/// ```
+/// use quickdraw::gesture::rubine::RubineRecognizer;
+/// use quickdraw::gesture::GestureRecognizer;
+/// use quickdraw::types::{GestureCapture, GestureTemplate};
+///
+/// let recognizer = RubineRecognizer::default();
+/// let capture = GestureCapture {
+///     points: vec![(0.0, 0.0), (10.0, 0.0), (20.0, 0.0)],
+///     timestamps: vec![0, 10, 20],
+/// };
+/// let template = recognizer.create_template("test".to_string(), &capture);
+/// let matches = recognizer.recognize(&capture, &[template]);
+/// assert!(matches.is_some());
+/// assert!(matches.unwrap().confidence > 0.9);
+/// ```
+pub struct RubineRecognizer ;
 ```
 
 ### src/input/hook.rs
@@ -143,7 +169,7 @@ pub struct GestureMatch { # [doc = " Matches the `name` field of the winning `Ge
 /// A registered gesture loaded from a gesture-profile TOML file.
 ///
 /// Fully serialisable so the config UI can round-trip templates over IPC.
-pub struct GestureTemplate { # [doc = " Human-readable identifier, e.g. `\"flick-right\"`.  Must be unique within"] # [doc = " a profile."] pub name : String , # [doc = " Pre-processed template points produced by the recogniser's normalise"] # [doc = " step (resampled, scaled, rotated).  Stored so the daemon can skip"] # [doc = " re-processing on every startup."] pub template_points : Vec < (f64 , f64) > , # [doc = " The algorithm that produced (and should match against) these points,"] # [doc = " e.g. `\"dollar_one\"`."] pub algorithm : String , }
+pub struct GestureTemplate { # [doc = " Human-readable identifier, e.g. `\"flick-right\"`.  Must be unique within"] # [doc = " a profile."] pub name : String , # [doc = " Pre-processed template points produced by the recogniser's normalise"] # [doc = " step (resampled, scaled, rotated). For Rubine, this holds the raw points"] # [doc = " from the capture. Stored so the daemon can skip re-processing on every startup."] pub template_points : Vec < (f64 , f64) > , # [doc = " Statistical feature vector for recognizers that use it (e.g. Rubine)."] # [serde (skip_serializing_if = "Option::is_none")] pub features : Option < Vec < f64 > > , # [doc = " The algorithm that produced (and should match against) these points,"] # [doc = " e.g. `\"dollar_one\"`."] pub algorithm : String , }
 
 /// A virtual key identifier as a human-readable string (e.g. `"F1"`, `"Ctrl"`).
 ///

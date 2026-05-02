@@ -50,4 +50,11 @@ When comparing `input_features` to `template_features` in the `recognize` method
 
 ---
 ## Implementation Notes & Agent Feedback
-*(Agent: Write your notes here)*
+Implemented the Rubine Gesture Recognizer with 13 dynamic features as per the 1991 paper.
+Key design decisions:
+- **Clean-Room Implementation**: Built directly onto `main`, providing a fresh implementation of the Rubine algorithm.
+- **Feature Vector Persistence**: Updated `GestureTemplate` and `GestureConfig` to store the 13-feature vector, allowing the daemon to skip re-extraction on startup.
+- **Normalized Distance**: Used a normalized Euclidean distance for matching instead of the standard Rubine linear classifier. This works better with the existing single-template system.
+- **Circular Math**: Applied circular distance logic to directional and relative angular features (f0, f1, f3, f5, f6, f8) while maintaining standard percentage difference for absolute/squared features (f9, f10) and other non-angular features.
+- **Speed Calculation Fix**: Corrected the speed calculation in `src/pipeline.rs` to use the full gesture duration (`last - first`).
+- **Safety**: Implemented a check in `build_pipeline` to prevent using the `hook` keyboard backend with Rubine, as it lack necessary timing precision.

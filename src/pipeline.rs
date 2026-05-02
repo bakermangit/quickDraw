@@ -9,7 +9,7 @@ use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
 use crate::config::{Config, TriggerConfig, GestureConfig};
 use crate::types::{GestureCapture, InputEvent, InputEventType, MouseButton};
 use crate::input::{InputSource, raw_input::RawInputSource, hook::HookInputSource};
-use crate::gesture::{GestureRecognizer, dollar_one::DollarOneRecognizer};
+use crate::gesture::{GestureRecognizer, dollar_one::DollarOneRecognizer, rubine::RubineRecognizer};
 use crate::types::GestureTemplate;
 use crate::output::{OutputAction, create_action};
 use crate::audio::AudioPlayer;
@@ -230,7 +230,9 @@ fn compute_path_length(capture: &GestureCapture) -> f64 {
 
 fn compute_speed(capture: &GestureCapture) -> f64 {
     let length = compute_path_length(capture);
-    let duration = capture.timestamps.last().copied().unwrap_or(0);
+    let first = capture.timestamps.first().copied().unwrap_or(0);
+    let last = capture.timestamps.last().copied().unwrap_or(0);
+    let duration = last.saturating_sub(first);
     if duration == 0 {
         0.0
     } else {
@@ -261,12 +263,18 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
 
     let keyboard_input_source: Box<dyn InputSource> = match config.general.keyboard_input_method.as_str() {
         "raw_input" => Box::new(RawInputSource::new(false, true)),
-        "hook" => Box::new(HookInputSource::new()),
+        "hook" => {
+            if config.general.recognizer == "rubine" {
+                return Err(anyhow!("The hook backend only supports mouse input when using the Rubine recognizer."));
+            }
+            Box::new(HookInputSource::new())
+        }
         other => return Err(anyhow!("Unknown keyboard input method: {}", other)),
     };
 
     let recognizer: Box<dyn GestureRecognizer> = match config.general.recognizer.as_str() {
         "dollar_one" => Box::new(DollarOneRecognizer::new()),
+        "rubine" => Box::new(RubineRecognizer::new()),
         other => return Err(anyhow!("Unknown recognizer: {}", other)),
     };
 
@@ -284,6 +292,7 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
         templates.push(GestureTemplate {
             name: name.clone(),
             template_points,
+            features: gesture.pattern.features.clone(),
             algorithm: gesture.pattern.algorithm.clone(),
         });
 
@@ -501,6 +510,7 @@ impl Pipeline {
                     let pattern = crate::config::GesturePatternConfig {
                         algorithm: template.algorithm,
                         template_points,
+                        features: template.features,
                     };
 
                     let gesture_config = crate::config::GestureConfig {

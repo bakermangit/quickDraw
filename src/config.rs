@@ -134,6 +134,8 @@ pub enum ActionConfig {
 pub struct GesturePatternConfig {
     pub algorithm: String,
     pub template_points: Vec<[f64; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub features: Option<Vec<f64>>,
 }
 
 pub fn get_config_dir() -> Result<PathBuf> {
