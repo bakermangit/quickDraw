@@ -1,9 +1,7 @@
 # Task: Clean-Room Implementation of the Rubine Recognizer
 
 ## Overview
-We need to implement a simplified Rubine Recognizer. You previously attempted this on an old branch, but that branch accumulated too much technical debt and merge conflicts. We are doing a clean-room implementation straight onto `main`.
-
-You must implement the 13 dynamic features from the 1991 Rubine paper, but use a normalized distance calculation so that human physical variance does not destroy the confidence score.
+We need to implement a simplified Rubine Recognizer. You must implement the 13 dynamic features from the 1991 Rubine paper, but use a normalized distance calculation so that human physical variance does not destroy the confidence score.
 
 ## Implementation Steps
 
