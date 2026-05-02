@@ -76,6 +76,7 @@ impl GestureRecognizer for DollarOneRecognizer {
             name,
             template_points,
             algorithm: self.name().to_string(),
+            features: None,
         }
     }
 

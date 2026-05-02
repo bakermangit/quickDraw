@@ -9,7 +9,7 @@ use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
 use crate::config::{Config, TriggerConfig, GestureConfig};
 use crate::types::{GestureCapture, InputEvent, InputEventType, MouseButton};
 use crate::input::{InputSource, raw_input::RawInputSource, hook::HookInputSource};
-use crate::gesture::{GestureRecognizer, dollar_one::DollarOneRecognizer};
+use crate::gesture::{GestureRecognizer, dollar_one::DollarOneRecognizer, rubine::RubineRecognizer};
 use crate::types::GestureTemplate;
 use crate::output::{OutputAction, create_action};
 use crate::audio::AudioPlayer;
@@ -230,7 +230,9 @@ fn compute_path_length(capture: &GestureCapture) -> f64 {
 
 fn compute_speed(capture: &GestureCapture) -> f64 {
     let length = compute_path_length(capture);
-    let duration = capture.timestamps.last().copied().unwrap_or(0);
+    let first = capture.timestamps.first().copied().unwrap_or(0);
+    let last = capture.timestamps.last().copied().unwrap_or(0);
+    let duration = last.saturating_sub(first);
     if duration == 0 {
         0.0
     } else {
@@ -261,12 +263,13 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
 
     let keyboard_input_source: Box<dyn InputSource> = match config.general.keyboard_input_method.as_str() {
         "raw_input" => Box::new(RawInputSource::new(false, true)),
-        "hook" => Box::new(HookInputSource::new()),
+        "hook" => return Err(anyhow!("The hook backend only supports mouse input.")),
         other => return Err(anyhow!("Unknown keyboard input method: {}", other)),
     };
 
     let recognizer: Box<dyn GestureRecognizer> = match config.general.recognizer.as_str() {
         "dollar_one" => Box::new(DollarOneRecognizer::new()),
+        "rubine" => Box::new(RubineRecognizer::new()),
         other => return Err(anyhow!("Unknown recognizer: {}", other)),
     };
 
@@ -278,14 +281,12 @@ pub fn build_pipeline(config: Config, capture_request_rx: mpsc::Receiver<Capture
 
     for gesture in profile.gestures {
         let name = gesture.name.clone();
-        let template_points = gesture.pattern.template_points.iter().map(|p| (p[0], p[1])).collect();
 
-        // Every template is added to the recognizer's pool
-        templates.push(GestureTemplate {
-            name: name.clone(),
-            template_points,
-            algorithm: gesture.pattern.algorithm.clone(),
-        });
+        // Re-process the raw capture data into a template using the active recognizer.
+        // This ensures that even if the profile was saved with a different algorithm,
+        // we can still match it if we have the raw points and timestamps.
+        let template = recognizer.create_template(name.clone(), &gesture.raw);
+        templates.push(template);
 
         // Last occurrence wins for actions and config overrides
         let action = create_action(&gesture.action)?;

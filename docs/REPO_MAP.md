@@ -49,6 +49,41 @@ pub trait GestureRecognizer : Send + 'static { # [doc = " Attempt to recognize a
 pub trait GestureFilter : Send + 'static { # [doc = " Post-recognition filter. Returns true if the gesture should be accepted."] fn accept (& self , capture : & GestureCapture , template : & GestureTemplate) -> bool ; # [doc = " Human-readable name"] fn name (& self) -> & str ; }
 ```
 
+### src/gesture/rubine.rs
+```rust
+/// Rubine Gesture Recognizer (1991)
+///
+/// This implementation uses the 13 dynamic features described in the paper:
+/// - f0, f1: Cosine and sine of initial angle
+/// - f2, f3: Length and angle of bounding box diagonal
+/// - f4, f5, f6: Distance, cosine, and sine of angle between first and last points
+/// - f7: Total stroke length
+/// - f8, f9, f10: Total angle, total absolute angle, sum of squared angle changes
+/// - f11: Maximum speed squared
+/// - f12: Total duration
+///
+/// Matching is performed using a normalized Euclidean distance on these features.
+///
+/// # Example
+///
+/// ```rust
+/// use quickdraw::gesture::rubine::RubineRecognizer;
+/// use quickdraw::gesture::GestureRecognizer;
+/// use quickdraw::types::GestureCapture;
+///
+/// let recognizer = RubineRecognizer::new();
+/// let capture = GestureCapture {
+///     points: vec![(0.0, 0.0), (10.0, 0.0), (20.0, 0.0)],
+///     timestamps: vec![0, 10, 20],
+/// };
+/// let template = recognizer.create_template("line".to_string(), &capture);
+/// let match_result = recognizer.recognize(&capture, &[template]).unwrap();
+/// assert_eq!(match_result.gesture_id, "line");
+/// assert!(match_result.confidence > 0.9);
+/// ```
+pub struct RubineRecognizer { }
+```
+
 ### src/input/hook.rs
 ```rust
 pub struct HookInputSource { thread_handle : Option < JoinHandle < () > > , thread_id : Option < u32 > , }
@@ -143,7 +178,7 @@ pub struct GestureMatch { # [doc = " Matches the `name` field of the winning `Ge
 /// A registered gesture loaded from a gesture-profile TOML file.
 ///
 /// Fully serialisable so the config UI can round-trip templates over IPC.
-pub struct GestureTemplate { # [doc = " Human-readable identifier, e.g. `\"flick-right\"`.  Must be unique within"] # [doc = " a profile."] pub name : String , # [doc = " Pre-processed template points produced by the recogniser's normalise"] # [doc = " step (resampled, scaled, rotated).  Stored so the daemon can skip"] # [doc = " re-processing on every startup."] pub template_points : Vec < (f64 , f64) > , # [doc = " The algorithm that produced (and should match against) these points,"] # [doc = " e.g. `\"dollar_one\"`."] pub algorithm : String , }
+pub struct GestureTemplate { # [doc = " Human-readable identifier, e.g. `\"flick-right\"`.  Must be unique within"] # [doc = " a profile."] pub name : String , # [doc = " Pre-processed template points produced by the recogniser's normalise"] # [doc = " step (resampled, scaled, rotated).  Stored so the daemon can skip"] # [doc = " re-processing on every startup."] pub template_points : Vec < (f64 , f64) > , # [doc = " The algorithm that produced (and should match against) these points,"] # [doc = " e.g. `\"dollar_one\"`."] pub algorithm : String , # [doc = " Statistical features for recognizers like Rubine."] pub features : Option < Vec < f64 > > , }
 
 /// A virtual key identifier as a human-readable string (e.g. `"F1"`, `"Ctrl"`).
 ///

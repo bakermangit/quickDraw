@@ -1,18 +1,8 @@
-mod config;
-mod pipeline;
-mod types;
-mod input;
-mod gesture;
-mod output;
-mod audio;
-mod tray;
-mod server;
-mod ui;
-
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use server::ServerState;
-use crate::types::SystemCommand;
+use quickdraw::server::ServerState;
+use quickdraw::types::SystemCommand;
+use quickdraw::{config, pipeline, tray, server};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -112,4 +102,3 @@ async fn main() -> anyhow::Result<()> {
     
     Ok(())
 }
-

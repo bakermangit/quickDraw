@@ -80,6 +80,8 @@ pub struct GestureTemplate {
     /// The algorithm that produced (and should match against) these points,
     /// e.g. `"dollar_one"`.
     pub algorithm: String,
+    /// Statistical features for recognizers like Rubine.
+    pub features: Option<Vec<f64>>,
 }
 
 // ---------------------------------------------------------------------------
