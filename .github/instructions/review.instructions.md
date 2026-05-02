@@ -1,8 +1,0 @@
-# Code Review Rules
-When asked to do a code review:
-1. Create a new markdown file in `/docs/reviews/` with a descriptive name. Use the prefix `review_` and suffix with the model named used to conduct review.
-2. In that file, include:
-   - A high-level summary.
-   - Specific optimizations/fixes.
-   - Mention the model used to conduct review.
-   - A "Final Prompt" that I can use to tell an agent to implement the fixes.
